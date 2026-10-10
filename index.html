@@ -189,13 +189,17 @@
     display: flex; flex-direction: column; gap: 10px;
   }
   .sheet .st { font-size: 16px; font-weight: 700; }
-  .sheet input[type=text], .sheet input[type=date], .sheet textarea {
+  .sheet input[type=text], .sheet input[type=date], .sheet input[type=time], .sheet textarea {
     background: #020617; border: 1px solid #334155; color: #e2e8f0;
     border-radius: 10px; padding: 10px; font-size: 15px; width: 100%;
     font-family: inherit; color-scheme: dark;
   }
   .sheet textarea { min-height: 64px; resize: vertical; }
   .sheet .flabel { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .sheet .hint { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+  .sheet .due-row { display: flex; gap: 10px; }
+  .sheet .due-row input[type=date] { flex: 2; }
+  .sheet .due-row input[type=time] { flex: 1; }
   .cat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
   .cat-row label {
     display: block; text-align: center; font-size: 12px; font-weight: 600;
@@ -259,15 +263,19 @@
     <input type="text" id="mTitle" placeholder="Que faut-il faire ?">
     <textarea id="mNote" placeholder="Note (optionnelle)"></textarea>
     <div class="flabel">📅 Échéance (optionnelle) — le tri se fait automatiquement</div>
-    <input type="date" id="mDue">
+    <div class="due-row">
+      <input type="date" id="mDue">
+      <input type="time" id="mTime">
+    </div>
+    <div class="hint">🕒 Heure (optionnelle) : l'événement agenda aura l'heure exacte (durée 1 h). Sans heure : journée entière.</div>
     <div class="flabel">🏷️ Type — l'événement agenda sera 🔴 rouge (pro) ou 🔵 bleu (perso)</div>
     <div class="cat-row type-row" id="mTypes" style="grid-template-columns:1fr 1fr"></div>
     <div class="cat-row" id="mCats"></div>
     <div class="row">
       <button class="cancel" onclick="closeModal()">Annuler</button>
-      <button class="ok" onclick="saveModal()">Enregistrer</button>
+      <button class="ok" onclick="saveModal()">💾 Enregistrer</button>
     </div>
-    <button class="agadd" onclick="saveAndAgenda()">💾 Enregistrer et 📅 mettre dans l'agenda</button>
+    <div class="hint" style="text-align:center">💾 Enregistrer écrit dans l'app <b>et</b> dans l'agenda Google (si échéance + agenda connecté) — sans doublon : la modification met à jour l'événement existant.</div>
   </div>
 </div>
 <div id="listModal" class="modal hidden">
@@ -284,8 +292,8 @@
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v3 : échéances, listes, sous-listes, agenda pro/perso coloré, sauvegarde Drive =====
-var APP_VERSION = "v3";
+// ===== Tâches & Relances — v4 : horaires, synchro agenda automatique (app + agenda en un seul enregistrement), sauvegarde Drive =====
+var APP_VERSION = "v4";
 var KEY = "taches-relances-v2";
 var TABS = ["urgent", "week", "later", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -332,6 +340,23 @@ function dayLabel(iso) {
   var p = String(iso).split("-");
   var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
   return JOURS[d.getDay()];
+}
+function validTime(hm) {
+  return (typeof hm === "string" && /^\d{2}:\d{2}$/.test(hm)) ? hm : null;
+}
+function addMinutesHM(hm, n) {
+  if (!validTime(hm)) return null;
+  var p = hm.split(":");
+  var d = new Date(2020, 0, 1, parseInt(p[0], 10), parseInt(p[1], 10));
+  d.setMinutes(d.getMinutes() + n);
+  return pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+}
+function isoWithOffset(dateStr, hm) {
+  var d = new Date(dateStr + "T" + hm + ":00");
+  var off = -d.getTimezoneOffset();
+  var sign = (off >= 0) ? "+" : "-";
+  var abs = Math.abs(off);
+  return dateStr + "T" + hm + ":00" + sign + pad2(Math.floor(abs / 60)) + ":" + pad2(abs % 60);
 }
 
 // ---------- État ----------
@@ -396,6 +421,8 @@ function promoteOverdue() {
 function cmpTasks(a, b) {
   var da = a.due || "9999-99-99", db = b.due || "9999-99-99";
   if (da !== db) return da < db ? -1 : 1;
+  var ta = a.time || "99:99", tb = b.time || "99:99";
+  if (ta !== tb) return ta < tb ? -1 : 1;
   return 0;
 }
 function dueHtml(t) {
@@ -415,14 +442,16 @@ function getTask(id) {
   }
   return null;
 }
-function addTask(title, note, cat, due, type) {
+function addTask(title, note, cat, due, type, time) {
   var t = {
     id: uid(),
     title: title,
     note: note || "",
     cat: (CATS.indexOf(cat) >= 0 && cat !== "done") ? cat : "urgent",
     due: (typeof due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(due)) ? due : null,
+    time: validTime(time),
     type: (TYPES.indexOf(type) >= 0) ? type : "perso",
+    agendaEventId: null,
     createdAt: today(),
     deferredFrom: null,
     doneAt: null
@@ -431,7 +460,7 @@ function addTask(title, note, cat, due, type) {
   save();
   return t;
 }
-function editTask(id, title, note, cat, due, type) {
+function editTask(id, title, note, cat, due, type, time) {
   var t = getTask(id);
   if (!t) return false;
   t.title = title;
@@ -440,6 +469,7 @@ function editTask(id, title, note, cat, due, type) {
   if (TYPES.indexOf(type) >= 0) t.type = type;
   if (t.cat !== "done") t.doneAt = null;
   t.due = (typeof due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(due)) ? due : null;
+  t.time = (t.due) ? validTime(time) : null;
   save();
   return true;
 }
@@ -591,7 +621,7 @@ function openList(id) {
 
 // ---------- Export / Import ----------
 function exportData() {
-  return { app: "taches-relances", version: 3, tasks: state.tasks, lists: state.lists, savedAt: Date.now() };
+  return { app: "taches-relances", version: 4, tasks: state.tasks, lists: state.lists, savedAt: Date.now() };
 }
 function importJsonText(txt) {
   var p = null;
@@ -608,7 +638,9 @@ function importJsonText(txt) {
       note: (typeof t.note === "string") ? t.note : "",
       cat: CATS.indexOf(t.cat) >= 0 ? t.cat : "urgent",
       due: (typeof t.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.due)) ? t.due : null,
+      time: validTime(t.time),
       type: TYPES.indexOf(t.type) >= 0 ? t.type : "perso",
+      agendaEventId: (typeof t.agendaEventId === "string" && t.agendaEventId) ? t.agendaEventId : null,
       createdAt: t.createdAt || today(),
       deferredFrom: t.deferredFrom || null,
       doneAt: t.doneAt || null
@@ -720,39 +752,96 @@ function agendaRefresh() {
     return false;
   });
 }
-// Écrire dans l'agenda : crée un événement "journée entière" à la date d'échéance de la tâche
-function taskToEvent(id) {
-  var t = getTask(id);
+// Écrire dans l'agenda : événement horodaté (durée 1 h) si la tâche a une heure, sinon journée entière.
+// Si la tâche a déjà un événement (agendaEventId), il est MIS À JOUR (jamais dupliqué).
+// Si l'échéance a été retirée, l'événement existant est SUPPRIMÉ de l'agenda.
+function buildEventBody(t) {
+  var ev = {
+    summary: (t.type === "pro" ? "🔴 " : "🔵 ") + t.title,
+    description: ((t.note || "") ? t.note + "\n" : "") + "(" + (t.type === "pro" ? "professionnel" : "personnel") + " — via Tâches & Relances)",
+    colorId: (t.type === "pro") ? "11" : "9"
+  };
+  if (t.time) {
+    ev.start = { dateTime: isoWithOffset(t.due, t.time) };
+    ev.end = { dateTime: isoWithOffset(t.due, addMinutesHM(t.time, 60)) };
+  } else {
+    ev.start = { date: t.due };
+    ev.end = { date: addDaysISO(t.due, 1) };
+  }
+  return ev;
+}
+function pushCreatedIntoCache(evData) {
+  try {
+    if (!state.agendaCache || !Array.isArray(state.agendaCache.events)) return;
+    var mapped = parseEvents({ items: [evData] })[0];
+    if (!mapped) return;
+    state.agendaCache.events = state.agendaCache.events.filter(function (e) { return e.id !== mapped.id; });
+    if (mapped.day >= today()) state.agendaCache.events.push(mapped);
+    save();
+    renderAll();
+  } catch (e) {}
+}
+function syncTaskToAgenda(t) {
   if (!t) return Promise.resolve(false);
-  if (!t.due) { showToast("⚠️ Donne d'abord une échéance à la tâche"); return Promise.resolve(false); }
   var cfg = state.cfg;
-  if (!cfg || !cfg.cid || !cfg.refresh) { showToast("⚠️ Connecte d'abord l'agenda (bouton 📅 en haut)"); return Promise.resolve(false); }
+  if (!t.due) {
+    // échéance retirée : supprimer l'événement agenda correspondant s'il existe
+    if (!t.agendaEventId) return Promise.resolve(true);
+    if (!cfg || !cfg.cid || !cfg.refresh) return Promise.resolve(false);
+    var evId = t.agendaEventId;
+    return agendaAccessToken(cfg).then(function (at) {
+      return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(evId), {
+        method: "DELETE",
+        headers: { "Authorization": "Bearer " + at }
+      }).then(function (r) {
+        if (r.status !== 204 && r.status !== 404 && r.status !== 410) throw new Error("delete refusé");
+      });
+    }).then(function () {
+      t.agendaEventId = null;
+      save();
+      if (state.agendaCache) {
+        state.agendaCache.events = (state.agendaCache.events || []).filter(function (e) { return e.id !== evId; });
+        save();
+      }
+      showToast("📅 Événement agenda supprimé (échéance retirée) : « " + t.title + " »");
+      return true;
+    }).catch(function () {
+      showToast("⚠️ Impossible de retirer l'événement de l'agenda — vérifie la connexion");
+      return false;
+    });
+  }
+  if (!cfg || !cfg.cid || !cfg.refresh) {
+    showToast("💾 Enregistré dans l'app — connecte l'agenda (bouton 📅) pour la synchroniser");
+    return Promise.resolve(false);
+  }
+  var isUpdate = !!t.agendaEventId;
   return agendaAccessToken(cfg).then(function (at) {
-    var ev = {
-      summary: (t.type === "pro" ? "🔴 " : "🔵 ") + t.title,
-      description: ((t.note || "") ? t.note + "\n" : "") + "(" + (t.type === "pro" ? "professionnel" : "personnel") + " — via Tâches & Relances)",
-      colorId: (t.type === "pro") ? "11" : "9",
-      start: { date: t.due },
-      end: { date: addDaysISO(t.due, 1) }
-    };
-    return agendaFetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
-      method: "POST",
+    var ev = buildEventBody(t);
+    var url = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+    var opts = {
+      method: isUpdate ? "PATCH" : "POST",
       headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" },
       body: JSON.stringify(ev)
-    }).then(function (created) {
-      if (!created || created.error) throw new Error("insert refusé");
-      showToast("📅 Événement créé dans l'agenda : « " + t.title + " » le " + fmtDate(t.due));
+    };
+    if (isUpdate) url += "/" + encodeURIComponent(t.agendaEventId);
+    return agendaFetch(url, opts).then(function (res) {
+      // événement supprimé côté agenda → en recréer un neuf
+      if (res && res.error && (res.error.code === 404 || res.error.code === 410)) {
+        t.agendaEventId = null;
+        save();
+        return syncTaskToAgenda(t);
+      }
+      if (!res || res.error || !res.id) throw new Error("sync refusé");
+      t.agendaEventId = res.id;
+      save();
+      pushCreatedIntoCache(res);
+      showToast((isUpdate ? "📅 Événement mis à jour" : "📅 Événement créé") + " : « " + t.title + " » le " + fmtDate(t.due) + (t.time ? " à " + t.time : ""));
       return true;
     });
   }).catch(function () {
     showToast("⚠️ Impossible d'écrire dans l'agenda — vérifie la connexion");
     return false;
   });
-}
-function saveAndAgenda() {
-  var t = saveModal();
-  if (!t) return;
-  taskToEvent(t.id);
 }
 
 // ---------- Sauvegarde Google Drive (dossier taffbmpm) ----------
@@ -909,14 +998,10 @@ function eventToTask(evId) {
   var ev = findEvent(evId);
   if (!ev) return false;
   var note = "";
-  if (!ev.allDay) {
-    note = "🕒 " + ev.startT + "–" + ev.endT;
-    if (ev.loc) note += " · " + ev.loc;
-  } else if (ev.loc) {
-    note = "📍 " + ev.loc;
-  }
+  if (!ev.allDay && ev.endT) note = "🕒 fin " + ev.endT;
+  if (ev.loc) note += (note ? " · " : "") + "📍 " + ev.loc;
   var type = (ev.color === "11") ? "pro" : "perso";
-  addTask(ev.title, note, "urgent", ev.day, type);
+  addTask(ev.title, note, "urgent", ev.day, type, (!ev.allDay && validTime(ev.startT)) ? ev.startT : null);
   showToast("✅ Tâche créée : " + ev.title);
   renderAll();
   return true;
@@ -937,6 +1022,7 @@ function taskHtml(t) {
   if (t.deferredFrom) meta.push('<span class="rep">➡️ reportée du ' + fmtDate(t.deferredFrom) + "</span>");
   var dh = dueHtml(t);
   if (dh) meta.push(dh);
+  if (t.time) meta.push("🕒 " + t.time);
   meta.push("créée le " + fmtDate(t.createdAt));
   var metaHtml = '<div class="meta">' + meta.join(" · ") + "</div>";
   var noteHtml = t.note ? '<div class="note">' + esc(t.note) + "</div>" : "";
@@ -1091,8 +1177,9 @@ function renderAgenda() {
   if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) {
     el.innerHTML = '<div class="cfg-card">'
       + '<div class="h">🔌 Connecter mon agenda Google</div>'
-      + '<div class="hint">Lecture de tes événements (7 jours) <b>et écriture</b> : une tâche peut être '
-      + 'placée dans ton agenda d\'un seul bouton.<br>Les tâches 🔴 <b>pro</b> créent un événement <b>rouge</b> '
+      + '<div class="hint">Lecture de tes événements (7 jours) <b>et écriture automatique</b> : chaque tâche enregistrée avec une échéance '
+      + 'est placée dans ton agenda en même temps (création puis mise à jour, sans doublon) — avec son 🕒 heure si tu en donnes une (durée 1 h), '
+      + 'sinon en journée entière.<br>Les tâches 🔴 <b>pro</b> créent un événement <b>rouge</b> '
       + 'dans l\'agenda, les tâches 🔵 <b>perso</b> un événement <b>bleu</b>.<br>Récupère un Refresh Token sur <b>OAuth Playground</b> '
       + 'avec le scope :<br><code>https://www.googleapis.com/auth/calendar</code><br>'
       + '(la même marche à suivre que la sauvegarde Drive de l\'app Patrimoine, avec ce scope-là — '
@@ -1193,6 +1280,7 @@ function openModal(id) {
   document.getElementById("mTitle").value = t ? t.title : "";
   document.getElementById("mNote").value = t ? t.note : "";
   document.getElementById("mDue").value = t && t.due ? t.due : "";
+  document.getElementById("mTime").value = t && t.time ? t.time : "";
   var defaultCat = t ? t.cat : (tab !== "done" && tab !== "lists" ? tab : "urgent");
   if (defaultCat === "done" || defaultCat === "lists") defaultCat = "urgent";
   pickCat(defaultCat);
@@ -1208,6 +1296,7 @@ function saveModal() {
   if (!title) { showToast("⚠️ Donne un titre à la tâche"); return null; }
   var note = document.getElementById("mNote").value || "";
   var due = document.getElementById("mDue").value || null;
+  var time = (document.getElementById("mTime").value || "").trim() || null;
   var cat = "urgent";
   ["urgent", "week", "later"].forEach(function (c) {
     var r = document.getElementById("mCat-" + c);
@@ -1220,13 +1309,14 @@ function saveModal() {
   });
   var t;
   if (editId) {
-    editTask(editId, title, note, cat, due, type);
+    editTask(editId, title, note, cat, due, type, time);
     t = getTask(editId);
   } else {
-    t = addTask(title, note, cat, due, type);
+    t = addTask(title, note, cat, due, type, time);
   }
   closeModal();
   renderAll();
+  syncTaskToAgenda(t); // enregistrement app + agenda Google en un seul geste
   return t;
 }
 
