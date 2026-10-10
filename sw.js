@@ -1,5 +1,5 @@
 'use strict';
-const CACHE = 'taches-relances-v4';
+const CACHE = 'taches-relances-v5';
 const ASSETS = [
   './',
   './index.html',

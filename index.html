@@ -218,6 +218,24 @@
     font-family: inherit; color-scheme: dark;
   }
   .ag-actions .on { border-color: #34d399; color: #34d399; background: rgba(52,211,153,0.08); }
+  .ag-actions select, .ag-actions option {
+    background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 9px 8px; font-size: 13px; font-weight: 600;
+    font-family: inherit; color-scheme: dark;
+  }
+  .warnbar {
+    margin: 10px 12px 0; max-width: 560px; margin-left: auto; margin-right: auto;
+    background: rgba(251,191,36,0.08); border: 1px solid #fbbf24; border-radius: 12px;
+    padding: 10px 12px; font-size: 13px; color: #fbbf24; line-height: 1.5;
+    display: flex; gap: 10px; align-items: center;
+  }
+  .warnbar button {
+    border: none; background: transparent; color: #fbbf24; font-weight: 700;
+    cursor: pointer; font-size: 15px; margin-left: auto; flex: 0 0 auto;
+  }
+  .syncline { font-size: 12px; color: #64748b; padding: 0 2px 6px; }
+  .task .meta .pend { color: #38bdf8; font-weight: 700; }
+  .task .meta .gone { color: #fb7185; font-weight: 700; }
   #toast {
     position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
     background: #1e293b; color: #f8fafc; border: 1px solid #334155;
@@ -238,6 +256,7 @@
 </header>
 <div id="view-tasks" class="wrap">
   <nav id="tabbar"></nav>
+  <div id="warnCard"></div>
   <main id="list"></main>
   <div class="data-card">
     <div class="lbl" id="persistLbl">Les données restent sur cet appareil.</div>
@@ -265,8 +284,11 @@
     <div class="st" id="mLabel">Nouvelle tâche</div>
     <input type="text" id="mTitle" placeholder="Que faut-il faire ?">
     <textarea id="mNote" placeholder="Note (optionnelle)"></textarea>
-    <div class="flabel">📅 Échéance (optionnelle) — le tri se fait automatiquement</div>
-    <input type="date" id="mDue">
+    <div class="flabel">📅 Début (échéance, tri automatique) — « Jusqu'au » = événement sur plusieurs jours</div>
+    <div class="time-row">
+      <input type="date" id="mDue" placeholder="Début">
+      <input type="date" id="mUntil" placeholder="Jusqu'au (optionnel)">
+    </div>
     <div class="flabel">🕒 Horaires (optionnels) — vides = journée entière ; se répercutent dans l'agenda</div>
     <div class="time-row">
       <input type="time" id="mStart" placeholder="Début">
@@ -309,8 +331,8 @@
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v4 : horaires, répétitions (RRULE), enregistrement → app + agenda en un geste, import auto agenda → tâches =====
-var APP_VERSION = "v4";
+// ===== Tâches & Relances — v5 : sync bidirectionnelle agenda↔tâches, multi-jours, file hors-ligne, fenêtre 30 j réglable, sauvegarde Drive auto + fusion PC/téléphone =====
+var APP_VERSION = "v5";
 var KEY = "taches-relances-v2";
 var TABS = ["urgent", "week", "later", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -412,6 +434,30 @@ function repLabel(rep) {
   if (r.count) s += " · " + r.count + " fois";
   return s;
 }
+// « Jusqu'au » valide : uniquement si une date de début existe et si fin >= début
+function cleanUntil(due, until) {
+  if (typeof until !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(until)) return null;
+  if (typeof due !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(due)) return null;
+  return (until >= due) ? until : null;
+}
+function stripEvTitle(s) {
+  return String(s || "").replace(/^(🔴|🔵)\s*/, "");
+}
+function fmtAgo(ts) {
+  if (!ts) return "jamais";
+  var m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return "à l'instant";
+  if (m < 60) return "il y a " + m + " min";
+  var h = Math.floor(m / 60);
+  if (h < 24) return "il y a " + h + " h";
+  return fmtDate(new Date(ts).toISOString().slice(0, 10));
+}
+function agendaWindowDays() {
+  var cfg = state.cfg || {};
+  var d = parseInt(cfg.agendaDays, 10);
+  if (d === 7 || d === 14 || d === 30) return d;
+  return 30;
+}
 
 // ---------- État ----------
 function normalize(p) {
@@ -421,7 +467,11 @@ function normalize(p) {
     cfg: (p.cfg && typeof p.cfg === "object") ? p.cfg : null,
     agendaCache: (p.agendaCache && typeof p.agendaCache === "object") ? p.agendaCache : null,
     autoAgenda: p.autoAgenda === true,
-    importedEvents: (p.importedEvents && typeof p.importedEvents === "object") ? p.importedEvents : {}
+    importedEvents: (p.importedEvents && typeof p.importedEvents === "object") ? p.importedEvents : {},
+    autoBackup: p.autoBackup !== false,
+    hideWarn: p.hideWarn === true,
+    pendingEventDeletes: Array.isArray(p.pendingEventDeletes) ? p.pendingEventDeletes : [],
+    driveSyncedAt: p.driveSyncedAt || null
   };
 }
 function load() {
@@ -440,14 +490,30 @@ function load() {
   }
   return { tasks: [], lists: [], cfg: null, agendaCache: null };
 }
-function save() {
+function persist() {
   try {
     localStorage.setItem(KEY, JSON.stringify({
       tasks: state.tasks, lists: state.lists, cfg: state.cfg,
       agendaCache: state.agendaCache, savedAt: Date.now(),
-      autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {}
+      autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
+      autoBackup: state.autoBackup !== false,
+      hideWarn: state.hideWarn === true,
+      pendingEventDeletes: state.pendingEventDeletes || [],
+      driveSyncedAt: state.driveSyncedAt || null
     }));
   } catch (e) {}
+}
+function save() {
+  persist();
+  scheduleDriveBackup();
+}
+// Sauvegarde Drive automatique : 30 s après le dernier changement (si Drive configuré)
+var driveTimer = null;
+function scheduleDriveBackup() {
+  if (typeof driveCfgOk === "function" && !driveCfgOk()) return;
+  if (state.autoBackup === false) return;
+  if (driveTimer) clearTimeout(driveTimer);
+  driveTimer = setTimeout(function () { driveTimer = null; driveBackupNow(true); }, 30000);
 }
 function storedSavedAt() {
   try {
@@ -469,7 +535,8 @@ function promoteOverdue() {
   var changed = false, td = today();
   state.tasks.forEach(function (t) {
     if (t.cat !== "done" && t.due && t.due < td && t.cat !== "urgent") {
-      t.cat = "urgent"; changed = true;
+      var stillRunning = (t.until && t.until >= td); // événement multi-jours en cours
+      if (!stillRunning) { t.cat = "urgent"; changed = true; }
     }
   });
   if (changed) save();
@@ -483,10 +550,13 @@ function cmpTasks(a, b) {
 function dueHtml(t) {
   var out = [];
   if (t.due) {
-    if (t.cat === "done") out.push("📅 " + fmtDate(t.due));
-    else {
+    var multi = t.until && t.until !== t.due;
+    if (t.cat === "done") {
+      out.push(multi ? ("📅 du " + fmtDate(t.due) + " au " + fmtDate(t.until)) : "📅 " + fmtDate(t.due));
+    } else {
       var td = today();
-      if (t.due < td) out.push('<span class="late">⚠️ en retard du ' + fmtDate(t.due) + "</span>");
+      if (multi) out.push("📅 du " + fmtDate(t.due) + " au " + fmtDate(t.until));
+      else if (t.due < td) out.push('<span class="late">⚠️ en retard du ' + fmtDate(t.due) + "</span>");
       else if (t.due === td) out.push('<span class="due-today">📅 aujourd\'hui</span>');
       else if (t.due === addDaysISO(td, 1)) out.push("📅 demain");
       else out.push("📅 " + fmtDate(t.due));
@@ -518,9 +588,13 @@ function addTask(title, note, cat, due, type, extra) {
     type: (TYPES.indexOf(type) >= 0) ? type : "perso",
     startT: validHM(extra.startT),
     endT: validHM(extra.endT),
+    until: cleanUntil(due, extra.until),
     rep: cleanRep(extra.rep),
     gEventId: (typeof extra.gEventId === "string" && extra.gEventId) ? extra.gEventId : null,
     autoImport: extra.autoImport === true,
+    gSync: extra.gSync || null,
+    localEdit: false,
+    evGone: false,
     createdAt: today(),
     deferredFrom: null,
     doneAt: null
@@ -541,7 +615,9 @@ function editTask(id, title, note, cat, due, type, extra) {
   t.due = (typeof due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(due)) ? due : null;
   t.startT = validHM(extra.startT);
   t.endT = validHM(extra.endT);
+  t.until = cleanUntil(t.due, extra.until);
   t.rep = cleanRep(extra.rep);
+  if (t.autoImport) t.localEdit = true; // tu l'as modifiée : Google ne l'écrasera plus
   save();
   return true;
 }
@@ -571,10 +647,15 @@ function reactivateTask(id) {
   return true;
 }
 function deleteTask(id) {
+  var t = getTask(id);
   var n = 0;
-  state.tasks = state.tasks.filter(function (t) { if (t.id !== id) return true; n++; return false; });
+  state.tasks = state.tasks.filter(function (x) { if (x.id !== id) return true; n++; return false; });
   delete armed[id];
-  if (n > 0) save();
+  if (n > 0) {
+    // la tâche avait créé un événement agenda → on le retire aussi (les tâches importées de l'agenda n'y touchent pas)
+    if (t && t.gEventId && !t.autoImport) agendaDeleteEvent(t.gEventId, t.title);
+    save();
+  }
   return n > 0;
 }
 function counts() {
@@ -694,9 +775,43 @@ function openList(id) {
 // ---------- Export / Import ----------
 function exportData() {
   return {
-    app: "taches-relances", version: 4, tasks: state.tasks, lists: state.lists,
+    app: "taches-relances", version: 5, tasks: state.tasks, lists: state.lists,
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     savedAt: Date.now()
+  };
+}
+// Normalisation d'une tâche importée/fusionnée (partagée par import et fusion Drive)
+function normalizeTaskIn(t) {
+  return {
+    id: (typeof t.id === "string" && t.id) ? t.id : uid(),
+    title: t.title,
+    note: (typeof t.note === "string") ? t.note : "",
+    cat: CATS.indexOf(t.cat) >= 0 ? t.cat : "urgent",
+    due: (typeof t.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.due)) ? t.due : null,
+    type: TYPES.indexOf(t.type) >= 0 ? t.type : "perso",
+    startT: validHM(t.startT),
+    endT: validHM(t.endT),
+    until: cleanUntil((typeof t.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.due)) ? t.due : null, t.until),
+    rep: cleanRep(t.rep),
+    gEventId: (typeof t.gEventId === "string" && t.gEventId) ? t.gEventId : null,
+    autoImport: t.autoImport === true,
+    gSync: (t.gSync === "pending" || t.gSync === "ok") ? t.gSync : null,
+    localEdit: t.localEdit === true,
+    evGone: t.evGone === true,
+    createdAt: t.createdAt || today(),
+    deferredFrom: t.deferredFrom || null,
+    doneAt: t.doneAt || null
+  };
+}
+function normalizeListIn(l) {
+  return {
+    id: (typeof l.id === "string" && l.id) ? l.id : uid(),
+    name: l.name,
+    createdAt: l.createdAt || today(),
+    parent: (typeof l.parent === "string" && l.parent) ? l.parent : null,
+    items: (Array.isArray(l.items) ? l.items : []).filter(function (it) { return it && typeof it.text === "string"; }).map(function (it) {
+      return { id: (typeof it.id === "string" && it.id) ? it.id : uid(), text: it.text, done: it.done === true };
+    })
   };
 }
 function importJsonText(txt) {
@@ -707,39 +822,62 @@ function importJsonText(txt) {
   var curSaved = storedSavedAt();
   if (inSaved < curSaved) return false;
   if (inSaved === 0 && state.tasks.length > 0) return false;
-  state.tasks = p.tasks.filter(function (t) { return t && typeof t.title === "string"; }).map(function (t) {
-    return {
-      id: (typeof t.id === "string" && t.id) ? t.id : uid(),
-      title: t.title,
-      note: (typeof t.note === "string") ? t.note : "",
-      cat: CATS.indexOf(t.cat) >= 0 ? t.cat : "urgent",
-      due: (typeof t.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.due)) ? t.due : null,
-      type: TYPES.indexOf(t.type) >= 0 ? t.type : "perso",
-      startT: validHM(t.startT),
-      endT: validHM(t.endT),
-      rep: cleanRep(t.rep),
-      gEventId: (typeof t.gEventId === "string" && t.gEventId) ? t.gEventId : null,
-      autoImport: t.autoImport === true,
-      createdAt: t.createdAt || today(),
-      deferredFrom: t.deferredFrom || null,
-      doneAt: t.doneAt || null
-    };
-  });
+  state.tasks = p.tasks.filter(function (t) { return t && typeof t.title === "string"; }).map(normalizeTaskIn);
+  state.lists = (Array.isArray(p.lists) ? p.lists : []).filter(function (l) { return l && typeof l.name === "string"; }).map(normalizeListIn);
   state.autoAgenda = p.autoAgenda === true;
   state.importedEvents = (p.importedEvents && typeof p.importedEvents === "object") ? p.importedEvents : {};
-  state.lists = (Array.isArray(p.lists) ? p.lists : []).filter(function (l) { return l && typeof l.name === "string"; }).map(function (l) {
-    return {
-      id: (typeof l.id === "string" && l.id) ? l.id : uid(),
-      name: l.name,
-      createdAt: l.createdAt || today(),
-      parent: (typeof l.parent === "string" && l.parent) ? l.parent : null,
-      items: (Array.isArray(l.items) ? l.items : []).filter(function (it) { return it && typeof it.text === "string"; }).map(function (it) {
-        return { id: (typeof it.id === "string" && it.id) ? it.id : uid(), text: it.text, done: it.done === true };
-      })
-    };
-  });
   save();
   return true;
+}
+// Fusion Drive → local (au démarrage) : AJOUTE ce qui manque ici sans rien écraser.
+// La sauvegarde auto renvoie ensuite l'ensemble fusionné vers Drive → les deux appareils se retrouvent.
+function driveMergeOnStart() {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.dCid || !cfg.dRefresh) return Promise.resolve(0);
+  var at = null;
+  return oauthToken(cfg.dCid, cfg.dSecret || "", cfg.dRefresh).then(function (tk) {
+    at = tk;
+    return driveEnsureFolder(at, driveFolderName());
+  }).then(function (fid) {
+    return driveFindFile(at, fid);
+  }).then(function (f) {
+    if (!f || !f.id) return null;
+    return agendaFetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(f.id) + "?alt=media", {
+      headers: { "Authorization": "Bearer " + at }
+    });
+  }).then(function (data) {
+    if (!data || !Array.isArray(data.tasks)) return 0;
+    var have = {};
+    state.tasks.forEach(function (t) { have[t.id] = true; });
+    var added = 0;
+    data.tasks.forEach(function (dt) {
+      if (!dt || typeof dt.title !== "string" || have[dt.id]) return;
+      state.tasks.push(normalizeTaskIn(dt));
+      have[dt.id] = true;
+      added++;
+    });
+    var haveL = {};
+    state.lists.forEach(function (l) { haveL[l.id] = true; });
+    (Array.isArray(data.lists) ? data.lists : []).forEach(function (dl) {
+      if (!dl || typeof dl.name !== "string" || haveL[dl.id]) return;
+      state.lists.push(normalizeListIn(dl));
+      haveL[dl.id] = true;
+      added++;
+    });
+    if (data.importedEvents && typeof data.importedEvents === "object") {
+      state.importedEvents = state.importedEvents || {};
+      Object.keys(data.importedEvents).forEach(function (k) {
+        if (!state.importedEvents[k]) state.importedEvents[k] = data.importedEvents[k];
+      });
+    }
+    if (data.autoAgenda === true) state.autoAgenda = true;
+    if (added > 0) {
+      save(); // persiste + relance une sauvegarde auto pour renvoyer la fusion sur Drive
+      renderAll();
+      showToast("☁️ Récupéré depuis Drive : " + added + " élément(s) absent(s) de cet appareil");
+    }
+    return added;
+  }).catch(function () { return 0; });
 }
 function doExport() {
   try {
@@ -779,11 +917,19 @@ function parseEvents(data) {
     var en = (it.end && (it.end.dateTime || it.end.date)) || "";
     var allDay = !(it.start && it.start.dateTime);
     var day = allDay ? (it.start && it.start.date) || "" : st.slice(0, 10);
+    var until = null;
+    // événement sur plusieurs jours : journée entière → end.date-1 ; horodaté → jour de fin si l'heure de fin est après le début
+    if (allDay && /^\d{4}-\d{2}-\d{2}$/.test(en) && en > day) until = addDaysISO(en, -1);
+    if (!allDay && /^\d{4}-\d{2}-\d{2}/.test(en)) {
+      var endDay = en.slice(0, 10);
+      if (endDay > day && en.slice(11, 16) > st.slice(11, 16)) until = endDay;
+    }
     return {
       id: it.id || uid(),
       title: it.summary || "(sans titre)",
       color: (it.colorId !== undefined && it.colorId !== null) ? String(it.colorId) : null,
       day: day,
+      until: until,
       allDay: allDay,
       startT: allDay ? "" : st.slice(11, 16),
       endT: allDay ? "" : (en.slice(11, 16) || ""),
@@ -819,21 +965,28 @@ function agendaRefresh(silent) {
   }
   return agendaAccessToken(cfg).then(function (at) {
     var now = new Date();
-    var end = new Date(now.getTime() + 7 * 86400000);
+    var win = agendaWindowDays();
+    var end = new Date(now.getTime() + win * 86400000);
     var url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
       + "?timeMin=" + encodeURIComponent(now.toISOString())
       + "&timeMax=" + encodeURIComponent(end.toISOString())
-      + "&singleEvents=true&orderBy=startTime&maxResults=100";
+      + "&singleEvents=true&orderBy=startTime&maxResults=250";
     return agendaFetch(url, { headers: { "Authorization": "Bearer " + at } });
   }).then(function (data) {
     state.agendaCache = { fetchedAt: Date.now(), events: parseEvents(data) };
-    var nImp = 0;
-    if (state.autoAgenda) nImp = autoImportAll();
-    save();
+    var nImp = 0, sync = null;
+    if (state.autoAgenda) {
+      nImp = autoImportAll();
+      sync = syncImportedFromCache();
+    }
+    persist();
     renderAll();
+    retryPendingSync();
     if (!silent) {
-      var msg = "📅 Agenda à jour — " + state.agendaCache.events.length + " événement(s) sur 7 jours";
-      if (nImp > 0) msg += " · " + nImp + " tâche(s) importée(s) automatiquement";
+      var msg = "📅 Agenda à jour — " + state.agendaCache.events.length + " événement(s) sur " + agendaWindowDays() + " jours";
+      if (nImp > 0) msg += " · " + nImp + " tâche(s) importée(s)";
+      if (sync && sync.nUpd > 0) msg += " · " + sync.nUpd + " mise(s) à jour";
+      if (sync && sync.nGone > 0) msg += " · " + sync.nGone + " événement(s) disparu(s)";
       showToast(msg);
     }
     return true;
@@ -852,8 +1005,11 @@ function autoImportAll() {
 function toggleAutoAgenda() {
   state.autoAgenda = !state.autoAgenda;
   var n = 0;
-  if (state.autoAgenda && state.agendaCache) n = autoImportAll();
-  save();
+  if (state.autoAgenda && state.agendaCache) {
+    n = autoImportAll();
+    syncImportedFromCache();
+  }
+  persist();
   renderAll();
   showToast(state.autoAgenda
     ? "📥 Import auto agenda → tâches : ACTIVÉ" + (n > 0 ? " (" + n + " tâche(s) importée(s))" : "")
@@ -870,20 +1026,31 @@ function importAllNow() {
   renderAll();
   showToast(n > 0 ? "📥 " + n + " événement(s) transformé(s) en tâche(s)" : "⚠️ Tout est déjà importé");
 }
-// Actualisation silencieuse si l'agenda n'a pas été rafraîchi depuis plus de 3 h (max 1 essai/min)
+// Actualisation silencieuse si l'agenda n'a pas été rafraîchi depuis plus de 15 min (max 1 essai/min)
 var lastAutoFetch = 0;
 function maybeAutoRefresh() {
   if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) return;
   var last = (state.agendaCache && state.agendaCache.fetchedAt) || 0;
-  if (Date.now() - last > 3 * 3600000 && Date.now() - lastAutoFetch > 60000) {
+  if (Date.now() - last > 15 * 60000 && Date.now() - lastAutoFetch > 60000) {
     lastAutoFetch = Date.now();
     agendaRefresh(true);
   }
+}
+function saveAgendaDays(v) {
+  var d = parseInt(v, 10);
+  if (d !== 7 && d !== 14 && d !== 30) d = 30;
+  state.cfg = Object.assign({}, state.cfg || {}, { agendaDays: d });
+  persist();
+  renderAll();
+  showToast("📅 Fenêtre agenda : " + d + " jours");
+  if (state.cfg && state.cfg.cid && state.cfg.refresh) agendaRefresh(true);
 }
 // Écrire dans l'agenda : événement horodaté ou journée entière, avec répétition (RRULE).
 // Si la tâche a déjà un gEventId : l'événement est MIS À JOUR (plus de doublon). Sinon il est créé.
 function taskEventBody(t) {
   var tz = deviceTz();
+  var multi = t.until && t.until !== t.due;
+  var lastDay = multi ? t.until : t.due;
   var ev = {
     summary: (t.type === "pro" ? "🔴 " : "🔵 ") + t.title,
     description: ((t.note || "") ? t.note + "\n" : "") + "(" + (t.type === "pro" ? "professionnel" : "personnel") + " — via Tâches & Relances)",
@@ -891,13 +1058,14 @@ function taskEventBody(t) {
   };
   if (t.startT) {
     ev.start = { dateTime: t.due + "T" + t.startT + ":00", timeZone: tz };
-    var endDay, endHM;
-    if (t.endT && t.endT > t.startT) { endDay = t.due; endHM = t.endT; }
-    else { var hp = hmPlus(t.startT, 60); endDay = addDaysISO(t.due, hp.plusDays); endHM = hp.hm; }
-    ev.end = { dateTime: endDay + "T" + endHM + ":00", timeZone: tz };
+    var endDay = multi ? t.until : t.due;
+    var endHM, plusDays = 0;
+    if (t.endT && t.endT > t.startT) { endHM = t.endT; }
+    else { var hp = hmPlus(t.startT, 60); endHM = hp.hm; plusDays = hp.plusDays; }
+    ev.end = { dateTime: addDaysISO(endDay, plusDays) + "T" + endHM + ":00", timeZone: tz };
   } else {
     ev.start = { date: t.due };
-    ev.end = { date: addDaysISO(t.due, 1) };
+    ev.end = { date: addDaysISO(lastDay, 1) };
   }
   var rule = repToRule(t.rep);
   if (rule) ev.recurrence = [rule];
@@ -930,15 +1098,52 @@ function taskToEvent(id) {
   }).then(function (created) {
     if (!created || created.error) throw new Error("écriture refusée");
     t.gEventId = created.id;
+    t.gSync = "ok";
     t.gSyncedAt = Date.now();
     save();
     showToast("📅 Événement « " + t.title + " » " + (wasUpdate ? "mis à jour" : "créé") + " dans l'agenda — " + fmtDate(t.due)
+      + (t.until && t.until !== t.due ? " → " + fmtDate(t.until) : "")
       + (t.rep ? " (" + repLabel(t.rep) + ")" : "") + (t.startT ? " " + t.startT + (t.endT ? "–" + t.endT : "") : ""));
     return true;
   }).catch(function () {
-    showToast("⚠️ Impossible d'écrire dans l'agenda — vérifie la connexion");
+    // hors-ligne ou erreur : la tâche est marquée « à synchroniser » et repartira automatiquement
+    t.gSync = "pending";
+    save();
+    showToast("⚠️ Impossible d'écrire dans l'agenda — 🔄 tâche marquée « à synchroniser », reprise auto plus tard");
     return false;
   });
+}
+// Supprimer l'événement Google lié (quand on supprime une tâche qui l'avait créé)
+function agendaDeleteEvent(evId, title, silent) {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.cid || !cfg.refresh || !evId) return Promise.resolve(false);
+  if (String(evId).indexOf("_") >= 0) return Promise.resolve(false); // instance récurrente : on n'y touche pas
+  return agendaAccessToken(cfg).then(function (at) {
+    return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(evId), {
+      method: "DELETE",
+      headers: { "Authorization": "Bearer " + at }
+    });
+  }).then(function (r) {
+    if (r.status !== 200 && r.status !== 204) throw new Error("delete refusé");
+    state.pendingEventDeletes = (state.pendingEventDeletes || []).filter(function (e) { return e !== evId; });
+    persist();
+    if (!silent) showToast("🗑️ Événement retiré de l'agenda" + (title ? " : « " + title + " »" : ""));
+    return true;
+  }).catch(function () {
+    state.pendingEventDeletes = state.pendingEventDeletes || [];
+    if (state.pendingEventDeletes.indexOf(evId) < 0) state.pendingEventDeletes.push(evId);
+    persist();
+    if (!silent) showToast("⚠️ L'événement n'a pas pu être retiré de l'agenda — 🔄 reprise auto plus tard");
+    return false;
+  });
+}
+// Reprise automatique : tâches en attente d'envoi agenda + événements à supprimer
+function retryPendingSync() {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.cid || !cfg.refresh) return;
+  var pend = state.tasks.filter(function (t) { return t.gSync === "pending" && t.due && !t.autoImport; });
+  pend.forEach(function (t) { taskToEvent(t.id); });
+  (state.pendingEventDeletes || []).slice().forEach(function (eid) { agendaDeleteEvent(eid, null, true); });
 }
 
 // ---------- Sauvegarde Google Drive (dossier taffbmpm) ----------
@@ -946,9 +1151,9 @@ function driveFolderName() {
   var cfg = state.cfg || {};
   return (cfg.dFolder && String(cfg.dFolder).trim()) || DRIVE_DEFAULT_FOLDER;
 }
-function driveBackupNow() {
+function driveBackupNow(silent) {
   var cfg = state.cfg;
-  if (!cfg || !cfg.dCid || !cfg.dRefresh) { showToast("⚠️ Configure d'abord la sauvegarde Drive"); return Promise.resolve(false); }
+  if (!cfg || !cfg.dCid || !cfg.dRefresh) { if (!silent) showToast("⚠️ Configure d'abord la sauvegarde Drive"); return Promise.resolve(false); }
   var folderName = driveFolderName();
   var content = JSON.stringify(exportData(), null, 2);
   return oauthToken(cfg.dCid, cfg.dSecret || "", cfg.dRefresh).then(function (at) {
@@ -959,12 +1164,21 @@ function driveBackupNow() {
       });
     });
   }).then(function (res) {
-    showToast("☁️ Sauvegardé sur Drive — « " + DRIVE_FILE_NAME + " » dans " + folderName + " (" + res + ")");
+    state.driveSyncedAt = Date.now();
+    persist();
+    if (!silent) showToast("☁️ Sauvegardé sur Drive — « " + DRIVE_FILE_NAME + " » dans " + folderName + " (" + res + ")");
     return true;
   }).catch(function () {
-    showToast("⚠️ Sauvegarde Drive impossible — vérifie la configuration");
+    if (!silent) showToast("⚠️ Sauvegarde Drive impossible — vérifie la configuration");
     return false;
   });
+}
+function toggleAutoBackup() {
+  state.autoBackup = state.autoBackup === false ? true : false;
+  persist();
+  renderAll();
+  showToast(state.autoBackup ? "☁️ Sauvegarde Drive auto : ✅ ON" : "☁️ Sauvegarde Drive auto : ❌ OFF");
+  if (state.autoBackup) scheduleDriveBackup();
 }
 function driveRestoreNow() {
   var cfg = state.cfg;
@@ -1074,6 +1288,8 @@ function driveSaveCfg() {
   save();
   renderAll();
   showToast("💾 Sauvegarde Drive configurée — dossier " + driveFolderName());
+  driveMergeOnStart().then(function () { retryPendingSync(); });
+  scheduleDriveBackup();
   return true;
 }
 function driveDisconnect() {
@@ -1091,27 +1307,69 @@ function agendaDisconnect() {
   renderAll();
   showToast("🔌 Agenda déconnecté");
 }
+// note reconstruite depuis un événement (heures + lieu) — sert à l'import et à la mise à jour
+function buildEvNote(ev) {
+  var note = "";
+  if (!ev.allDay && (ev.startT || ev.endT)) note = "🕒 " + ev.startT + (ev.endT ? "–" + ev.endT : "");
+  if (ev.until && ev.until !== ev.day) note += (note ? " · " : "") + "jusqu'au " + fmtDate(ev.until);
+  if (ev.loc) note += (note ? " · " : "") + "📍 " + ev.loc;
+  return note;
+}
 // Importer un événement de l'agenda en tâche — dédoublonné via importedEvents
 function importEventAsTask(ev, silent) {
   if (!ev || !ev.day || !/^\d{4}-\d{2}-\d{2}$/.test(ev.day)) return null;
   state.importedEvents = state.importedEvents || {};
   if (state.importedEvents[ev.id]) return null;
-  var title = String(ev.title || "(sans titre)").replace(/^(🔴|🔵)\s*/, "");
+  var title = stripEvTitle(ev.title);
   var type = (ev.color === "11") ? "pro" : "perso";
-  var note = "";
-  if (!ev.allDay && (ev.startT || ev.endT)) note = "🕒 " + ev.startT + (ev.endT ? "–" + ev.endT : "");
-  if (ev.loc) note += (note ? " · " : "") + "📍 " + ev.loc;
   var td = today();
   var cat = (ev.day <= td) ? "urgent" : "week";
-  var t = addTask(title, note, cat, ev.day, type, {
+  var t = addTask(title, buildEvNote(ev), cat, ev.day, type, {
     startT: ev.allDay ? null : validHM(ev.startT),
     endT: ev.allDay ? null : validHM(ev.endT),
+    until: ev.until,
     gEventId: ev.id,
     autoImport: true
   });
   state.importedEvents[ev.id] = { taskId: t.id, title: t.title, day: ev.day, at: Date.now() };
   save();
   return t;
+}
+// Synchro retour Google → tâches : met à jour les tâches importées dont l'événement a bougé,
+// marque celles dont l'événement a disparu. Ne touche jamais aux tâches que tu as modifiées (localEdit) ni aux terminées.
+function syncImportedFromCache() {
+  var evs = (state.agendaCache && state.agendaCache.events) || [];
+  var byId = {};
+  evs.forEach(function (e) { byId[e.id] = e; });
+  var horizon = addDaysISO(today(), agendaWindowDays());
+  var nUpd = 0, nGone = 0;
+  Object.keys(state.importedEvents || {}).forEach(function (evId) {
+    var rec = state.importedEvents[evId];
+    var t = getTask(rec.taskId);
+    if (!t) return; // tâche supprimée localement : on garde la trace pour ne pas la réimporter
+    var ev = byId[evId];
+    if (ev) {
+      if (t.evGone) { t.evGone = false; nUpd++; }
+      if (t.localEdit || t.cat === "done") return; // tes modifs priment ; les terminées ne bougent plus
+      var changed = false;
+      var newTitle = stripEvTitle(ev.title);
+      if (newTitle !== t.title) { t.title = newTitle; changed = true; }
+      if (ev.day !== t.due) { t.due = ev.day; changed = true; }
+      if ((ev.until || null) !== (t.until || null)) { t.until = ev.until || null; changed = true; }
+      if (!ev.allDay) {
+        var ns = validHM(ev.startT), ne = validHM(ev.endT);
+        if (ns !== t.startT) { t.startT = ns; changed = true; }
+        if (ne !== t.endT) { t.endT = ne; changed = true; }
+      } else if (t.startT || t.endT) { t.startT = null; t.endT = null; changed = true; }
+      var newNote = buildEvNote(ev);
+      if (newNote !== (t.note || "")) { t.note = newNote; changed = true; }
+      if (changed) nUpd++;
+    } else if (t.due && t.due <= horizon && t.cat !== "done") {
+      if (!t.evGone) { t.evGone = true; nGone++; }
+    }
+  });
+  if (nUpd > 0 || nGone > 0) persist();
+  return { nUpd: nUpd, nGone: nGone };
 }
 function eventToTask(evId) {
   var ev = findEvent(evId);
@@ -1137,6 +1395,9 @@ function taskHtml(t) {
   var meta = [];
   if (t.deferredFrom) meta.push('<span class="rep">➡️ reportée du ' + fmtDate(t.deferredFrom) + "</span>");
   if (t.autoImport) meta.push('<span class="rep">📥 via agenda</span>');
+  if (t.evGone) meta.push('<span class="gone">⚠️ plus dans l\'agenda</span>');
+  if (t.gSync === "pending") meta.push('<span class="pend">🔄 à synchroniser</span>');
+  else if (t.gSync === "ok") meta.push("📅 agenda ✓");
   var dh = dueHtml(t);
   if (dh) meta.push(dh);
   meta.push("créée le " + fmtDate(t.createdAt));
@@ -1181,6 +1442,29 @@ function renderTasksTab() {
   el.innerHTML = html;
   renderDriveCard();
 }
+function renderWarnCard() {
+  var el = document.getElementById("warnCard");
+  if (!el) return;
+  var cfg = state.cfg || {};
+  var needAgenda = !cfg.cid || !cfg.refresh;
+  var needDrive = !cfg.dCid || !cfg.dRefresh;
+  if ((needAgenda || needDrive) && state.hideWarn !== true) {
+    var txt = "⚠️ <b>Synchro inactive sur cet appareil</b> — ";
+    var parts = [];
+    if (needAgenda) parts.push("agenda Google non connecté");
+    if (needDrive) parts.push("sauvegarde Drive non configurée");
+    txt += parts.join(" · ") + ". Onglet 📅 → « Connecter mon agenda Google », et carte ☁️ ci-dessous.";
+    el.innerHTML = '<div class="warnbar"><span>' + txt + "</span>"
+      + '<button title="Masquer" onclick="hideWarnCard()">✕</button></div>';
+  } else {
+    el.innerHTML = "";
+  }
+}
+function hideWarnCard() {
+  state.hideWarn = true;
+  persist();
+  renderWarnCard();
+}
 function renderDriveCard() {
   var el = document.getElementById("driveCard");
   if (!el) return;
@@ -1188,7 +1472,8 @@ function renderDriveCard() {
   if (!cfg.dCid || !cfg.dRefresh) {
     el.innerHTML = '<div class="lbl">☁️ Sauvegarde Google Drive — dossier « ' + esc(DRIVE_DEFAULT_FOLDER) + ' »</div>'
       + '<div class="hint">Sauvegarde tes tâches et listes dans le dossier <b>' + esc(DRIVE_DEFAULT_FOLDER) + '</b> de ton Drive. '
-      + 'Réutilise le Refresh Token de l\'app Patrimoine (scope <code>https://www.googleapis.com/auth/drive.file</code>).</div>'
+      + 'Réutilise le Refresh Token de l\'app Patrimoine (scope <code>https://www.googleapis.com/auth/drive.file</code>). '
+      + 'Une fois configurée, la sauvegarde devient <b>automatique</b> (30 s après chaque changement) et <b>fusionne</b> les appareils.</div>'
       + '<input id="dCid" placeholder="Client ID Google">'
       + '<input id="dSecret" placeholder="Client Secret (optionnel)" type="password">'
       + '<input id="dRefresh" placeholder="Refresh Token (drive.file — même que Patrimoine)" type="password">'
@@ -1196,10 +1481,13 @@ function renderDriveCard() {
       + '<div class="btns"><button onclick="driveSaveCfg()">💾 Enregistrer et connecter</button></div>';
     return;
   }
+  var autoB = state.autoBackup !== false;
   el.innerHTML = '<div class="lbl">☁️ Sauvegarde Drive : dossier « ' + esc(cfg.dFolder || DRIVE_DEFAULT_FOLDER) + ' » — ' + esc(DRIVE_FILE_NAME) + '</div>'
+    + '<div class="syncline">Dernière sauvegarde : ' + fmtAgo(state.driveSyncedAt) + " · Sauvegarde auto : " + (autoB ? "✅ ON" : "❌ OFF") + "</div>"
     + '<div class="btns">'
     + '<button onclick="driveBackupNow()">☁️ Sauvegarder maintenant</button>'
-    + '<button onclick="driveRestoreNow()">📥 Restaurer depuis Drive</button>'
+    + '<button onclick="toggleAutoBackup()">' + (autoB ? "⏸️ Désactiver l'auto" : "▶️ Activer l'auto") + "</button>"
+    + '<button onclick="driveRestoreNow()">📥 Restaurer (remplace tout)</button>'
     + '<button onclick="driveDisconnect()">Déconnecter</button>'
     + "</div>";
 }
@@ -1293,8 +1581,9 @@ function renderAgenda() {
   if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) {
     el.innerHTML = '<div class="cfg-card">'
       + '<div class="h">🔌 Connecter mon agenda Google</div>'
-      + '<div class="hint">Lecture de tes événements (7 jours) <b>et écriture</b> : une tâche peut être '
-      + 'placée dans ton agenda d\'un seul bouton.<br>Les tâches 🔴 <b>pro</b> créent un événement <b>rouge</b> '
+      + '<div class="hint">Lecture de tes événements (fenêtre réglable 7/14/30 jours, 30 par défaut) <b>et écriture bidirectionnelle</b> : '
+      + 'une tâche peut être placée dans ton agenda d\'un seul bouton, se met à jour si tu la modifies, '
+      + 'et l\'événement est supprimé de l\'agenda si tu supprimes la tâche (et inversement).<br>Les tâches 🔴 <b>pro</b> créent un événement <b>rouge</b> '
       + 'dans l\'agenda, les tâches 🔵 <b>perso</b> un événement <b>bleu</b>.<br>Récupère un Refresh Token sur <b>OAuth Playground</b> '
       + 'avec le scope :<br><code>https://www.googleapis.com/auth/calendar</code><br>'
       + '(la même marche à suivre que la sauvegarde Drive de l\'app Patrimoine, avec ce scope-là — '
@@ -1310,16 +1599,23 @@ function renderAgenda() {
   maybeAutoRefresh();
   var evs = (state.agendaCache && state.agendaCache.events) || [];
   var auto = state.autoAgenda === true;
+  var win = agendaWindowDays();
   var html = '<div class="ag-actions">'
-    + '<button onclick="agendaRefresh()">🔄 Actualiser (7 jours)</button>'
+    + '<button onclick="agendaRefresh()">🔄 Actualiser</button>'
+    + '<select onchange="saveAgendaDays(this.value)">'
+    + '<option value="7"' + (win === 7 ? " selected" : "") + '>7 jours</option>'
+    + '<option value="14"' + (win === 14 ? " selected" : "") + '>14 jours</option>'
+    + '<option value="30"' + (win === 30 ? " selected" : "") + '>30 jours</option>'
+    + "</select>"
     + '<button onclick="importAllNow()">📥 Tout importer en tâches</button>'
     + '<button class="' + (auto ? "on" : "") + '" onclick="toggleAutoAgenda()">' + (auto ? "📥 Import auto : ✅ ON" : "📥 Import auto : ❌ OFF") + "</button>"
     + '<button onclick="agendaDisconnect()">Déconnecter</button>'
     + "</div>"
+    + '<div class="syncline">Dernière synchro agenda : ' + fmtAgo(state.agendaCache && state.agendaCache.fetchedAt) + "</div>"
     + '<div class="hint" style="font-size:12px;color:#94a3b8;padding:0 2px 6px">'
     + (auto
-      ? "✅ Import auto <b>activé</b> : chaque actualisation transforme automatiquement les nouveaux événements des 7 prochains jours en tâches (sans doublon)."
-      : "📥 Import auto <b>désactivé</b> : active-le pour que chaque événement de l'agenda devienne une tâche tout seul, ou utilise « Tout importer en tâches ».")
+      ? "✅ Import auto <b>activé</b> : chaque actualisation transforme les nouveaux événements des " + win + " prochains jours en tâches, <b>et met à jour les tâches si l'événement bouge</b> (sauf celles que tu modifies toi-même)."
+      : "📥 Import auto <b>désactivé</b> : active-le pour que chaque événement de l'agenda devienne une tâche tout seul et se mette à jour tout seul, ou utilise « Tout importer en tâches ».")
     + "</div>";
   if (evs.length === 0) {
     html += '<div class="empty">Aucun événement chargé — appuie sur 🔄 Actualiser.<br>'
@@ -1330,7 +1626,8 @@ function renderAgenda() {
   Object.keys(days).sort().forEach(function (day) {
     html += '<div class="day-h">📅 ' + dayLabel(day) + " <small>" + fmtDate(day) + "</small></div>";
     days[day].forEach(function (e) {
-      var when = e.allDay ? "journée entière" : "🕒 " + e.startT + "–" + e.endT;
+      var when = e.allDay ? "journée entière" : "🕒 " + e.startT + (e.endT ? "–" + e.endT : "");
+      if (e.until && e.until !== e.day) when += " → jusqu'au " + fmtDate(e.until);
       var loc = e.loc ? " · " + esc(e.loc) : "";
       var dot = (e.color === "11") ? "🔴 " : ((e.color === "9") ? "🔵 " : "");
       html += '<div class="ev"><div class="ev-b"><div class="title">' + dot + esc(e.title) + "</div>"
@@ -1358,6 +1655,7 @@ function onFab() {
 }
 function renderAll() {
   renderTabs();
+  renderWarnCard();
   if (view === "tasks") renderTasksTab();
   else if (view === "list") renderListDetail();
   else renderAgenda();
@@ -1404,6 +1702,7 @@ function openModal(id) {
   document.getElementById("mTitle").value = t ? t.title : "";
   document.getElementById("mNote").value = t ? t.note : "";
   document.getElementById("mDue").value = t && t.due ? t.due : "";
+  document.getElementById("mUntil").value = (t && t.until && t.until !== t.due) ? t.until : "";
   document.getElementById("mStart").value = t && t.startT ? t.startT : "";
   document.getElementById("mEnd").value = t && t.endT ? t.endT : "";
   document.getElementById("mRep").value = (t && t.rep && t.rep.mode) ? t.rep.mode : "none";
@@ -1442,6 +1741,8 @@ function saveModal(autoSync) {
   if (!title) { showToast("⚠️ Donne un titre à la tâche"); return null; }
   var note = document.getElementById("mNote").value || "";
   var due = document.getElementById("mDue").value || null;
+  var until = ((document.getElementById("mUntil") || {}).value || "").trim() || null;
+  if (until && due && until < due) { showToast("⚠️ « Jusqu'au » doit être après la date de début"); return null; }
   var startT = validHM(((document.getElementById("mStart") || {}).value || "").trim());
   var endT = validHM(((document.getElementById("mEnd") || {}).value || "").trim());
   if (startT && endT && endT <= startT) { showToast("⚠️ L'heure de fin doit être après l'heure de début"); return null; }
@@ -1457,7 +1758,7 @@ function saveModal(autoSync) {
     var r = document.getElementById("mType-" + c);
     if (r && r.checked) type = c;
   });
-  var extra = { startT: startT, endT: endT, rep: rep };
+  var extra = { startT: startT, endT: endT, until: until, rep: rep };
   var t;
   if (editId) {
     editTask(editId, title, note, cat, due, type, extra);
@@ -1514,8 +1815,21 @@ function showToast(msg) {
 document.getElementById("vBadge").textContent = APP_VERSION;
 renderCats();
 showView("tasks");
-// Agenda connecté (+ import auto activé) : rafraîchissement silencieux au démarrage si les données ont plus de 3 h
-maybeAutoRefresh();
+// Au lancement : 1) fusion avec la sauvegarde Drive (récupère ce qui manque sur cet appareil)
+// 2) reprise des tâches « à synchroniser » 3) rafraîchissement agenda silencieux si périmé
+driveMergeOnStart().then(function () {
+  retryPendingSync();
+  maybeAutoRefresh();
+});
+// Retour au premier plan de l'app (PWA) : on resynchronise
+if (typeof document !== "undefined" && document.addEventListener) {
+  document.addEventListener("visibilitychange", function () {
+    if (typeof document.hidden === "undefined" || !document.hidden) {
+      maybeAutoRefresh();
+      retryPendingSync();
+    }
+  });
+}
 if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().then(function (ok) {
     var lbl = document.getElementById("persistLbl");
