@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#020617">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Mes tâches</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #020617; color: #e2e8f0;
+    padding-bottom: 96px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(2, 6, 23, 0.92); backdrop-filter: blur(6px);
+    padding: 14px 16px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #1e293b;
+  }
+  header .left { display: flex; align-items: baseline; gap: 8px; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  .badge { font-size: 12px; color: #94a3b8; font-weight: 400; }
+  .agbtn {
+    background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 6px 10px; font-size: 16px; cursor: pointer;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  .hidden { display: none !important; }
+  #tabbar {
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 5px;
+    padding: 10px 10px 6px; max-width: 560px; margin: 0 auto;
+  }
+  .tab {
+    border: 1px solid #1e293b; background: #0f172a; color: #cbd5e1;
+    border-radius: 12px; padding: 7px 2px; font-size: 11px; font-weight: 600;
+    cursor: pointer; text-align: center; line-height: 1.4;
+  }
+  .tab .n { display: block; font-size: 15px; font-weight: 800; }
+  .tab.active.urgent { border-color: #fb7185; color: #fb7185; background: rgba(251,113,133,0.08); }
+  .tab.active.week   { border-color: #fbbf24; color: #fbbf24; background: rgba(251,191,36,0.08); }
+  .tab.active.later  { border-color: #34d399; color: #34d399; background: rgba(52,211,153,0.08); }
+  .tab.active.lists  { border-color: #a78bfa; color: #a78bfa; background: rgba(167,139,250,0.08); }
+  .tab.active.done   { border-color: #94a3b8; color: #e2e8f0; background: rgba(148,163,184,0.08); }
+  #list, #agBody, #listDetail { padding: 8px 12px; max-width: 560px; margin: 0 auto; }
+  .task {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 14px;
+    padding: 12px; margin-bottom: 10px; display: flex; gap: 10px; align-items: flex-start;
+  }
+  .task.urgent { border-left: 4px solid #fb7185; }
+  .task.week   { border-left: 4px solid #fbbf24; }
+  .task.later  { border-left: 4px solid #34d399; }
+  .task.done   { border-left: 4px solid #475569; opacity: 0.75; }
+  .task .body { flex: 1; min-width: 0; }
+  .task .title { font-size: 15px; font-weight: 600; word-wrap: break-word; }
+  .task.done .title { text-decoration: line-through; color: #94a3b8; }
+  .task .note { font-size: 13px; color: #94a3b8; margin-top: 2px; white-space: pre-wrap; word-wrap: break-word; }
+  .task .meta { font-size: 11px; color: #64748b; margin-top: 5px; }
+  .task .meta .rep { color: #fbbf24; }
+  .task .meta .late { color: #fb7185; font-weight: 700; }
+  .task .meta .due-today { color: #fbbf24; font-weight: 700; }
+  .chk {
+    flex: 0 0 30px; height: 30px; border-radius: 50%;
+    border: 2px solid #475569; background: transparent; color: #020617;
+    font-size: 15px; font-weight: 800; cursor: pointer; line-height: 1;
+  }
+  .chk:active { background: #34d399; border-color: #34d399; }
+  .acts { display: flex; flex-direction: column; gap: 6px; }
+  .acts button, .rowbtn {
+    border: 1px solid #1e293b; background: #020617; color: #cbd5e1;
+    border-radius: 9px; padding: 4px 8px; font-size: 13px; cursor: pointer;
+  }
+  .acts button.armed, .rowbtn.armed { background: #7f1d1d; border-color: #fb7185; color: #fecdd3; font-weight: 700; }
+  .empty { text-align: center; color: #64748b; font-size: 14px; padding: 40px 16px; }
+  /* Listes */
+  .listcard {
+    background: #0f172a; border: 1px solid #1e293b; border-left: 4px solid #a78bfa;
+    border-radius: 14px; padding: 12px; margin-bottom: 10px;
+  }
+  .listcard .name { font-size: 15px; font-weight: 700; cursor: pointer; }
+  .listcard .row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .bar { flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; }
+  .bar > div { height: 100%; background: #34d399; border-radius: 4px; transition: width 0.3s; }
+  .listcard .cnt { font-size: 12px; color: #94a3b8; white-space: nowrap; }
+  .listcard .acts { flex-direction: row; margin-top: 8px; }
+  .item {
+    display: flex; align-items: center; gap: 10px;
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 12px;
+    padding: 10px 12px; margin-bottom: 8px;
+  }
+  .item .txt { flex: 1; font-size: 14px; word-wrap: break-word; }
+  .item .txt.done { text-decoration: line-through; color: #64748b; }
+  .item .chk { flex: 0 0 26px; height: 26px; font-size: 13px; }
+  .item .chk.on { background: #34d399; border-color: #34d399; }
+  .item .del { background: transparent; border: none; color: #64748b; font-size: 15px; cursor: pointer; padding: 4px; }
+  .addrow { display: flex; gap: 8px; margin-top: 10px; }
+  .addrow input {
+    flex: 1; background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 14px; font-family: inherit;
+  }
+  .addrow button {
+    background: #a78bfa; border: none; color: #020617; font-weight: 700;
+    border-radius: 10px; padding: 10px 14px; font-size: 14px; cursor: pointer;
+  }
+  .ld-head { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
+  .ld-head .t { flex: 1; min-width: 0; }
+  .ld-head h2 { font-size: 17px; word-wrap: break-word; }
+  .ld-head .cnt { font-size: 12px; color: #94a3b8; }
+  .ld-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .ld-foot .rowbtn, .ld-foot button {
+    border: 1px solid #334155; background: #0f172a; color: #cbd5e1;
+    border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  /* Agenda */
+  .ag-head { display: flex; align-items: center; gap: 12px; padding: 14px 12px 4px; max-width: 560px; margin: 0 auto; }
+  .ag-head h2 { font-size: 18px; }
+  .day-h { font-size: 13px; font-weight: 700; color: #38bdf8; margin: 16px 0 8px; }
+  .day-h small { color: #64748b; font-weight: 400; }
+  .ev {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 12px;
+    padding: 11px 12px; margin-bottom: 8px; display: flex; gap: 10px; align-items: center;
+  }
+  .ev .ev-b { flex: 1; min-width: 0; }
+  .ev .title { font-size: 14px; font-weight: 600; word-wrap: break-word; }
+  .ev .meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .ev .chk { flex: 0 0 30px; height: 30px; background: #38bdf8; border-color: #38bdf8; color: #020617; }
+  .ag-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
+  .ag-actions button, .cfg-card button {
+    border: 1px solid #334155; background: #0f172a; color: #e2e8f0;
+    border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .cfg-card {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 14px;
+    padding: 14px; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .cfg-card .h { font-size: 14px; font-weight: 700; }
+  .cfg-card .hint { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+  .cfg-card input {
+    background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 14px; width: 100%; font-family: inherit;
+  }
+  .cfg-card .hint code { color: #38bdf8; word-break: break-all; }
+  .data-card input {
+    background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 14px; width: 100%;
+    font-family: inherit; margin-bottom: 8px;
+  }
+  .data-card .hint { font-size: 12px; color: #94a3b8; line-height: 1.5; margin-bottom: 8px; }
+  .data-card .hint code { color: #38bdf8; word-break: break-all; }
+  .listcard.sub { margin-left: 22px; border-left-style: dashed; }
+  .listcard.sub .name { font-size: 14px; }
+  .listcard .subn { font-size: 11px; color: #a78bfa; margin-top: 2px; }
+  .subchips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .subchips button {
+    border: 1px dashed #a78bfa; background: #020617; color: #c4b5fd;
+    border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .task .tp { margin-right: 3px; }
+  .data-card {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 14px;
+    padding: 12px; margin: 6px 12px 16px; max-width: 560px; margin-left: auto; margin-right: auto;
+  }
+  .data-card .lbl { font-size: 13px; color: #94a3b8; margin-bottom: 8px; }
+  .data-card .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .data-card button {
+    border: 1px solid #334155; background: #020617; color: #e2e8f0;
+    border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  #fab {
+    position: fixed; right: 18px; bottom: 22px; z-index: 30;
+    width: 58px; height: 58px; border-radius: 50%;
+    background: #38bdf8; color: #020617; border: none;
+    font-size: 30px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 18px rgba(56,189,248,0.4);
+  }
+  .modal {
+    position: fixed; inset: 0; z-index: 40; background: rgba(2,6,23,0.7);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .sheet {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 18px 18px 0 0;
+    width: 100%; max-width: 560px; padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .sheet .st { font-size: 16px; font-weight: 700; }
+  .sheet input[type=text], .sheet input[type=date], .sheet textarea {
+    background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 15px; width: 100%;
+    font-family: inherit; color-scheme: dark;
+  }
+  .sheet textarea { min-height: 64px; resize: vertical; }
+  .sheet .flabel { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .cat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .cat-row label {
+    display: block; text-align: center; font-size: 12px; font-weight: 600;
+    border: 1px solid #334155; border-radius: 10px; padding: 8px 4px; cursor: pointer; color: #cbd5e1;
+  }
+  .cat-row input { display: none; }
+  .cat-row label.on { border-color: #38bdf8; background: rgba(56,189,248,0.1); }
+  .sheet .row { display: flex; gap: 10px; }
+  .sheet .row button { flex: 1; border-radius: 10px; padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; border: none; }
+  .sheet .row .cancel { background: #1e293b; color: #e2e8f0; }
+  .sheet .row .ok { background: #38bdf8; color: #020617; }
+  .sheet .agadd {
+    width: 100%; border: 1px dashed #334155; background: #020617; color: #94a3b8;
+    border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  #toast {
+    position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+    background: #1e293b; color: #f8fafc; border: 1px solid #334155;
+    border-radius: 12px; padding: 10px 16px; font-size: 14px;
+    opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 60;
+    max-width: 90%; text-align: center;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <div class="left">
+    <h1>📋 Mes tâches</h1>
+    <span class="badge">💾 auto · <span id="vBadge"></span></span>
+  </div>
+  <button class="agbtn" onclick="showView('agenda')">📅</button>
+</header>
+<div id="view-tasks" class="wrap">
+  <nav id="tabbar"></nav>
+  <main id="list"></main>
+  <div class="data-card">
+    <div class="lbl" id="persistLbl">Les données restent sur cet appareil.</div>
+    <div class="btns">
+      <button onclick="doExport()">💾 Exporter (secours)</button>
+      <button onclick="document.getElementById('importFile').click()">📥 Importer</button>
+    </div>
+  </div>
+  <div class="data-card" id="driveCard"></div>
+</div>
+<div id="view-agenda" class="hidden">
+  <div class="ag-head">
+    <button class="rowbtn" onclick="showView('tasks')">← Tâches</button>
+    <h2>📅 Mon agenda</h2>
+  </div>
+  <div id="agBody"></div>
+</div>
+<div id="view-list" class="hidden">
+  <div id="listDetail"></div>
+</div>
+<input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="handleImport(event)">
+<button id="fab" onclick="onFab()">＋</button>
+<div id="modal" class="modal hidden">
+  <div class="sheet">
+    <div class="st" id="mLabel">Nouvelle tâche</div>
+    <input type="text" id="mTitle" placeholder="Que faut-il faire ?">
+    <textarea id="mNote" placeholder="Note (optionnelle)"></textarea>
+    <div class="flabel">📅 Échéance (optionnelle) — le tri se fait automatiquement</div>
+    <input type="date" id="mDue">
+    <div class="flabel">🏷️ Type — l'événement agenda sera 🔴 rouge (pro) ou 🔵 bleu (perso)</div>
+    <div class="cat-row type-row" id="mTypes" style="grid-template-columns:1fr 1fr"></div>
+    <div class="cat-row" id="mCats"></div>
+    <div class="row">
+      <button class="cancel" onclick="closeModal()">Annuler</button>
+      <button class="ok" onclick="saveModal()">Enregistrer</button>
+    </div>
+    <button class="agadd" onclick="saveAndAgenda()">💾 Enregistrer et 📅 mettre dans l'agenda</button>
+  </div>
+</div>
+<div id="listModal" class="modal hidden">
+  <div class="sheet">
+    <div class="st" id="lLabel">Nouvelle liste</div>
+    <input type="text" id="lName" placeholder="Nom de la liste (ex : Matériel manœuvre)">
+    <div class="row">
+      <button class="cancel" onclick="closeListModal()">Annuler</button>
+      <button class="ok" onclick="saveListModal()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+"use strict";
+
+// ===== Tâches & Relances — v3 : échéances, listes, sous-listes, agenda pro/perso coloré, sauvegarde Drive =====
+var APP_VERSION = "v3";
+var KEY = "taches-relances-v2";
+var TABS = ["urgent", "week", "later", "lists", "done"];
+var CATS = ["urgent", "week", "later", "done"];
+var CAT_LABELS = { urgent: "🔴 Urgent", week: "🟠 Semaine", later: "🟢 Plus tard", lists: "🧺 Listes", done: "✅ Terminé" };
+var CAT_SHORT = { urgent: "Urgent", week: "Semaine", later: "Plus tard", done: "Terminé" };
+var TYPES = ["pro", "perso"];
+var TYPE_LABELS = { pro: "🔴 Pro", perso: "🔵 Perso" };
+var DRIVE_FILE_NAME = "taches-relances.json";
+var DRIVE_DEFAULT_FOLDER = "taffbmpm";
+var DEFAULT_DATA = {
+  "savedAt": 0,
+  "tasks": [],
+  "lists": [
+    { "id": "starter-materiel", "name": "🎒 Matériel exercice", "createdAt": "2026-10-10", "items": [] }
+  ]
+};
+
+// ---------- Helpers ----------
+function uid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function pad2(n) { return (n < 10 ? "0" : "") + n; }
+function today() {
+  var d = new Date();
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+function addDaysISO(iso, n) {
+  var p = String(iso).split("-");
+  var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+  d.setDate(d.getDate() + n);
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+function fmtDate(iso) {
+  if (!iso || typeof iso !== "string" || iso.length < 10) return "";
+  var p = iso.split("-");
+  return p[2] + "/" + p[1] + "/" + p[0];
+}
+function dayLabel(iso) {
+  var JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  var p = String(iso).split("-");
+  var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+  return JOURS[d.getDay()];
+}
+
+// ---------- État ----------
+function normalize(p) {
+  return {
+    tasks: Array.isArray(p.tasks) ? p.tasks : [],
+    lists: Array.isArray(p.lists) ? p.lists : [],
+    cfg: (p.cfg && typeof p.cfg === "object") ? p.cfg : null,
+    agendaCache: (p.agendaCache && typeof p.agendaCache === "object") ? p.agendaCache : null
+  };
+}
+function load() {
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) {
+      var p = JSON.parse(raw);
+      var pSaved = p.savedAt || 0;
+      var dSaved = (DEFAULT_DATA && DEFAULT_DATA.savedAt) || 0;
+      if (pSaved >= dSaved) return normalize(p);
+      // stockage plus ancien que le fichier ouvert -> ignorer
+    }
+  } catch (e) {}
+  if (typeof DEFAULT_DATA !== "undefined" && DEFAULT_DATA && Array.isArray(DEFAULT_DATA.tasks)) {
+    return normalize({ tasks: DEFAULT_DATA.tasks, lists: DEFAULT_DATA.lists || [] });
+  }
+  return { tasks: [], lists: [], cfg: null, agendaCache: null };
+}
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify({
+      tasks: state.tasks, lists: state.lists, cfg: state.cfg,
+      agendaCache: state.agendaCache, savedAt: Date.now()
+    }));
+  } catch (e) {}
+}
+function storedSavedAt() {
+  try {
+    var p = JSON.parse(localStorage.getItem(KEY) || "null");
+    return (p && p.savedAt) || 0;
+  } catch (e) { return 0; }
+}
+var state = load();
+var tab = "urgent";
+var view = "tasks";        // "tasks" | "agenda" | "list"
+var currentListId = null;  // liste ouverte en détail
+var editId = null;         // tâche éditée
+var editListId = null;     // liste éditée
+var newListParent = null;  // parent de la prochaine sous-liste créée
+var armed = {};            // suppressions à confirmer (id -> timestamp)
+
+// ---------- Urgence : échéances ----------
+function promoteOverdue() {
+  var changed = false, td = today();
+  state.tasks.forEach(function (t) {
+    if (t.cat !== "done" && t.due && t.due < td && t.cat !== "urgent") {
+      t.cat = "urgent"; changed = true;
+    }
+  });
+  if (changed) save();
+  return changed;
+}
+function cmpTasks(a, b) {
+  var da = a.due || "9999-99-99", db = b.due || "9999-99-99";
+  if (da !== db) return da < db ? -1 : 1;
+  return 0;
+}
+function dueHtml(t) {
+  if (!t.due) return "";
+  if (t.cat === "done") return "📅 " + fmtDate(t.due);
+  var td = today();
+  if (t.due < td) return '<span class="late">⚠️ en retard du ' + fmtDate(t.due) + "</span>";
+  if (t.due === td) return '<span class="due-today">📅 aujourd\'hui</span>';
+  if (t.due === addDaysISO(td, 1)) return "📅 demain";
+  return "📅 " + fmtDate(t.due);
+}
+
+// ---------- Tâches ----------
+function getTask(id) {
+  for (var i = 0; i < state.tasks.length; i++) {
+    if (state.tasks[i].id === id) return state.tasks[i];
+  }
+  return null;
+}
+function addTask(title, note, cat, due, type) {
+  var t = {
+    id: uid(),
+    title: title,
+    note: note || "",
+    cat: (CATS.indexOf(cat) >= 0 && cat !== "done") ? cat : "urgent",
+    due: (typeof due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(due)) ? due : null,
+    type: (TYPES.indexOf(type) >= 0) ? type : "perso",
+    createdAt: today(),
+    deferredFrom: null,
+    doneAt: null
+  };
+  state.tasks.unshift(t);
+  save();
+  return t;
+}
+function editTask(id, title, note, cat, due, type) {
+  var t = getTask(id);
+  if (!t) return false;
+  t.title = title;
+  t.note = note || "";
+  if (CATS.indexOf(cat) >= 0) t.cat = cat;
+  if (TYPES.indexOf(type) >= 0) t.type = type;
+  if (t.cat !== "done") t.doneAt = null;
+  t.due = (typeof due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(due)) ? due : null;
+  save();
+  return true;
+}
+function completeTask(id) {
+  var t = getTask(id);
+  if (!t) return false;
+  t.cat = "done";
+  t.doneAt = today();
+  t.deferredFrom = null;
+  save();
+  return true;
+}
+function deferTask(id) {
+  var t = getTask(id);
+  if (!t) return false;
+  t.cat = "urgent";
+  t.deferredFrom = today();
+  save();
+  return true;
+}
+function reactivateTask(id) {
+  var t = getTask(id);
+  if (!t) return false;
+  t.cat = "urgent";
+  t.doneAt = null;
+  save();
+  return true;
+}
+function deleteTask(id) {
+  var n = 0;
+  state.tasks = state.tasks.filter(function (t) { if (t.id !== id) return true; n++; return false; });
+  delete armed[id];
+  if (n > 0) save();
+  return n > 0;
+}
+function counts() {
+  var c = { urgent: 0, week: 0, later: 0, done: 0, lists: state.lists.length };
+  state.tasks.forEach(function (t) { if (c[t.cat] !== undefined) c[t.cat]++; });
+  return c;
+}
+function onDelete(id) {
+  if (armed[id]) { deleteTask(id); }
+  else {
+    armed[id] = Date.now();
+    setTimeout(function () { delete armed[id]; try { renderAll(); } catch (e) {} }, 3000);
+  }
+  renderAll();
+}
+
+// ---------- Listes de matériel ----------
+function getList(id) {
+  for (var i = 0; i < state.lists.length; i++) {
+    if (state.lists[i].id === id) return state.lists[i];
+  }
+  return null;
+}
+function addList(name, parent) {
+  var p = (typeof parent === "string" && getList(parent)) ? parent : null;
+  var l = { id: uid(), name: name, createdAt: today(), parent: p, items: [] };
+  if (p) {
+    var pi = state.lists.indexOf(getList(p));
+    state.lists.splice(pi >= 0 ? pi + 1 : 0, 0, l);
+  } else {
+    state.lists.unshift(l);
+  }
+  save();
+  return l;
+}
+function renameList(id, name) {
+  var l = getList(id);
+  if (!l) return false;
+  l.name = name;
+  save();
+  return true;
+}
+function deleteList(id) {
+  var n = 0;
+  state.lists = state.lists.filter(function (l) { if (l.id !== id) return true; n++; return false; });
+  state.lists.forEach(function (l) { if (l.parent === id) l.parent = null; });
+  delete armed["L:" + id];
+  if (currentListId === id) { currentListId = null; }
+  if (n > 0) save();
+  return n > 0;
+}
+function addItem(listId, text) {
+  var l = getList(listId);
+  if (!l) return null;
+  var it = { id: uid(), text: text, done: false };
+  l.items.push(it);
+  save();
+  return it;
+}
+function toggleItem(listId, itemId) {
+  var l = getList(listId);
+  if (!l) return false;
+  for (var i = 0; i < l.items.length; i++) {
+    if (l.items[i].id === itemId) { l.items[i].done = !l.items[i].done; save(); return true; }
+  }
+  return false;
+}
+function deleteItem(listId, itemId) {
+  var l = getList(listId);
+  if (!l) return false;
+  var n = 0;
+  l.items = l.items.filter(function (it) { if (it.id !== itemId) return true; n++; return false; });
+  if (n > 0) save();
+  return n > 0;
+}
+function resetChecks(listId) {
+  var l = getList(listId);
+  if (!l) return false;
+  l.items.forEach(function (it) { it.done = false; });
+  save();
+  return true;
+}
+function duplicateList(listId) {
+  var src = getList(listId);
+  if (!src) return null;
+  var copy = {
+    id: uid(),
+    name: src.name + " (copie)",
+    createdAt: today(),
+    parent: src.parent || null,
+    items: src.items.map(function (it) { return { id: uid(), text: it.text, done: false }; })
+  };
+  state.lists.unshift(copy);
+  save();
+  return copy;
+}
+function listProgress(l) {
+  var done = 0;
+  l.items.forEach(function (it) { if (it.done) done++; });
+  return { done: done, total: l.items.length };
+}
+function onDeleteList(id) {
+  var key = "L:" + id;
+  if (armed[key]) { deleteList(id); }
+  else {
+    armed[key] = Date.now();
+    setTimeout(function () { delete armed[key]; try { renderAll(); } catch (e) {} }, 3000);
+  }
+  renderAll();
+}
+function openList(id) {
+  if (!getList(id)) return;
+  currentListId = id;
+  showView("list");
+}
+
+// ---------- Export / Import ----------
+function exportData() {
+  return { app: "taches-relances", version: 3, tasks: state.tasks, lists: state.lists, savedAt: Date.now() };
+}
+function importJsonText(txt) {
+  var p = null;
+  try { p = JSON.parse(txt); } catch (e) { return false; }
+  if (!p || !Array.isArray(p.tasks)) return false;
+  var inSaved = p.savedAt || 0;
+  var curSaved = storedSavedAt();
+  if (inSaved < curSaved) return false;
+  if (inSaved === 0 && state.tasks.length > 0) return false;
+  state.tasks = p.tasks.filter(function (t) { return t && typeof t.title === "string"; }).map(function (t) {
+    return {
+      id: (typeof t.id === "string" && t.id) ? t.id : uid(),
+      title: t.title,
+      note: (typeof t.note === "string") ? t.note : "",
+      cat: CATS.indexOf(t.cat) >= 0 ? t.cat : "urgent",
+      due: (typeof t.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.due)) ? t.due : null,
+      type: TYPES.indexOf(t.type) >= 0 ? t.type : "perso",
+      createdAt: t.createdAt || today(),
+      deferredFrom: t.deferredFrom || null,
+      doneAt: t.doneAt || null
+    };
+  });
+  state.lists = (Array.isArray(p.lists) ? p.lists : []).filter(function (l) { return l && typeof l.name === "string"; }).map(function (l) {
+    return {
+      id: (typeof l.id === "string" && l.id) ? l.id : uid(),
+      name: l.name,
+      createdAt: l.createdAt || today(),
+      parent: (typeof l.parent === "string" && l.parent) ? l.parent : null,
+      items: (Array.isArray(l.items) ? l.items : []).filter(function (it) { return it && typeof it.text === "string"; }).map(function (it) {
+        return { id: (typeof it.id === "string" && it.id) ? it.id : uid(), text: it.text, done: it.done === true };
+      })
+    };
+  });
+  save();
+  return true;
+}
+function doExport() {
+  try {
+    var blob = new Blob([JSON.stringify(exportData(), null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "taches-" + today() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+    showToast("💾 Export téléchargé");
+  } catch (e) { showToast("⚠️ Export impossible"); }
+}
+function handleImport(ev) {
+  var f = ev && ev.target && ev.target.files ? ev.target.files[0] : null;
+  if (!f) return;
+  try {
+    f.text().then(function (txt) {
+      var ok = importJsonText(txt);
+      renderAll();
+      showToast(ok ? "✅ Sauvegarde importée" : "⚠️ Import refusé (fichier invalide ou données locales plus récentes)");
+    }).catch(function () { showToast("⚠️ Lecture impossible"); });
+  } catch (e) { showToast("⚠️ Lecture impossible"); }
+  if (ev && ev.target) ev.target.value = "";
+}
+
+// ---------- Agenda Google (lecture + écriture) ----------
+function findEvent(evId) {
+  var evs = (state.agendaCache && state.agendaCache.events) || [];
+  for (var i = 0; i < evs.length; i++) { if (evs[i].id === evId) return evs[i]; }
+  return null;
+}
+function parseEvents(data) {
+  var items = (data && Array.isArray(data.items)) ? data.items : [];
+  return items.map(function (it) {
+    var st = (it.start && (it.start.dateTime || it.start.date)) || "";
+    var en = (it.end && (it.end.dateTime || it.end.date)) || "";
+    var allDay = !(it.start && it.start.dateTime);
+    var day = allDay ? (it.start && it.start.date) || "" : st.slice(0, 10);
+    return {
+      id: it.id || uid(),
+      title: it.summary || "(sans titre)",
+      color: (it.colorId !== undefined && it.colorId !== null) ? String(it.colorId) : null,
+      day: day,
+      allDay: allDay,
+      startT: allDay ? "" : st.slice(11, 16),
+      endT: allDay ? "" : (en.slice(11, 16) || ""),
+      loc: (typeof it.location === "string") ? it.location : ""
+    };
+  }).filter(function (e) { return /^\d{4}-\d{2}-\d{2}$/.test(e.day); });
+}
+function agendaFetch(url, options) {
+  return fetch(url, options).then(function (r) { return r.json(); });
+}
+function agendaAccessToken(cfg) {
+  return oauthToken(cfg.cid, cfg.csec || "", cfg.refresh);
+}
+function oauthToken(cid, csec, refresh) {
+  var body = "client_id=" + encodeURIComponent(cid)
+    + "&client_secret=" + encodeURIComponent(csec || "")
+    + "&refresh_token=" + encodeURIComponent(refresh)
+    + "&grant_type=refresh_token";
+  return agendaFetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body
+  }).then(function (tk) {
+    if (!tk || tk.error || !tk.access_token) throw new Error(tk && tk.error);
+    return tk.access_token;
+  });
+}
+function agendaRefresh() {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.cid || !cfg.refresh) { showToast("⚠️ Configure d'abord l'agenda"); return Promise.resolve(false); }
+  return agendaAccessToken(cfg).then(function (at) {
+    var now = new Date();
+    var end = new Date(now.getTime() + 7 * 86400000);
+    var url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+      + "?timeMin=" + encodeURIComponent(now.toISOString())
+      + "&timeMax=" + encodeURIComponent(end.toISOString())
+      + "&singleEvents=true&orderBy=startTime&maxResults=100";
+    return agendaFetch(url, { headers: { "Authorization": "Bearer " + at } });
+  }).then(function (data) {
+    state.agendaCache = { fetchedAt: Date.now(), events: parseEvents(data) };
+    save();
+    renderAll();
+    showToast("📅 Agenda à jour — " + state.agendaCache.events.length + " événement(s) sur 7 jours");
+    return true;
+  }).catch(function () {
+    showToast("⚠️ Agenda indisponible — vérifie la configuration");
+    return false;
+  });
+}
+// Écrire dans l'agenda : crée un événement "journée entière" à la date d'échéance de la tâche
+function taskToEvent(id) {
+  var t = getTask(id);
+  if (!t) return Promise.resolve(false);
+  if (!t.due) { showToast("⚠️ Donne d'abord une échéance à la tâche"); return Promise.resolve(false); }
+  var cfg = state.cfg;
+  if (!cfg || !cfg.cid || !cfg.refresh) { showToast("⚠️ Connecte d'abord l'agenda (bouton 📅 en haut)"); return Promise.resolve(false); }
+  return agendaAccessToken(cfg).then(function (at) {
+    var ev = {
+      summary: (t.type === "pro" ? "🔴 " : "🔵 ") + t.title,
+      description: ((t.note || "") ? t.note + "\n" : "") + "(" + (t.type === "pro" ? "professionnel" : "personnel") + " — via Tâches & Relances)",
+      colorId: (t.type === "pro") ? "11" : "9",
+      start: { date: t.due },
+      end: { date: addDaysISO(t.due, 1) }
+    };
+    return agendaFetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" },
+      body: JSON.stringify(ev)
+    }).then(function (created) {
+      if (!created || created.error) throw new Error("insert refusé");
+      showToast("📅 Événement créé dans l'agenda : « " + t.title + " » le " + fmtDate(t.due));
+      return true;
+    });
+  }).catch(function () {
+    showToast("⚠️ Impossible d'écrire dans l'agenda — vérifie la connexion");
+    return false;
+  });
+}
+function saveAndAgenda() {
+  var t = saveModal();
+  if (!t) return;
+  taskToEvent(t.id);
+}
+
+// ---------- Sauvegarde Google Drive (dossier taffbmpm) ----------
+function driveFolderName() {
+  var cfg = state.cfg || {};
+  return (cfg.dFolder && String(cfg.dFolder).trim()) || DRIVE_DEFAULT_FOLDER;
+}
+function driveBackupNow() {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.dCid || !cfg.dRefresh) { showToast("⚠️ Configure d'abord la sauvegarde Drive"); return Promise.resolve(false); }
+  var folderName = driveFolderName();
+  var content = JSON.stringify(exportData(), null, 2);
+  return oauthToken(cfg.dCid, cfg.dSecret || "", cfg.dRefresh).then(function (at) {
+    return driveEnsureFolder(at, folderName).then(function (fid) {
+      return driveFindFile(at, fid).then(function (existing) {
+        if (existing && existing.id) return driveUpdateFile(at, existing.id, content).then(function () { return "mis à jour"; });
+        return driveCreateFile(at, fid, content).then(function () { return "créé"; });
+      });
+    });
+  }).then(function (res) {
+    showToast("☁️ Sauvegardé sur Drive — « " + DRIVE_FILE_NAME + " » dans " + folderName + " (" + res + ")");
+    return true;
+  }).catch(function () {
+    showToast("⚠️ Sauvegarde Drive impossible — vérifie la configuration");
+    return false;
+  });
+}
+function driveRestoreNow() {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.dCid || !cfg.dRefresh) { showToast("⚠️ Configure d'abord la sauvegarde Drive"); return Promise.resolve(false); }
+  var folderName = driveFolderName();
+  var at = null;
+  return oauthToken(cfg.dCid, cfg.dSecret || "", cfg.dRefresh).then(function (tk) {
+    at = tk;
+    return driveEnsureFolder(at, folderName);
+  }).then(function (fid) {
+    return driveFindFile(at, fid);
+  }).then(function (f) {
+    if (!f || !f.id) { showToast("⚠️ Aucune sauvegarde trouvée sur Drive"); return null; }
+    return agendaFetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(f.id) + "?alt=media", {
+      headers: { "Authorization": "Bearer " + at }
+    });
+  }).then(function (data) {
+    if (!data) return false;
+    var ok = importJsonText(JSON.stringify(data));
+    renderAll();
+    showToast(ok ? "✅ Sauvegarde Drive restaurée" : "⚠️ Contenu Drive invalide ou plus ancien que tes données locales");
+    return ok;
+  }).catch(function () {
+    showToast("⚠️ Restauration Drive impossible — vérifie la configuration");
+    return false;
+  });
+}
+function driveEnsureFolder(at, name) {
+  var q = "mimeType = 'application/vnd.google-apps.folder' and name = '" + name.replace(/'/g, "\\'") + "' and trashed = false";
+  var url = "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(q) + "&fields=files(id,name)&pageSize=5";
+  return agendaFetch(url, { headers: { "Authorization": "Bearer " + at } }).then(function (data) {
+    var files = (data && Array.isArray(data.files)) ? data.files : [];
+    for (var i = 0; i < files.length; i++) {
+      if (files[i].name === name) return files[i].id;
+    }
+    return agendaFetch("https://www.googleapis.com/drive/v3/files", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name, mimeType: "application/vnd.google-apps.folder" })
+    }).then(function (f) {
+      if (!f || f.error || !f.id) throw new Error("dossier refusé");
+      return f.id;
+    });
+  });
+}
+function driveFindFile(at, folderId) {
+  var q = "name = '" + DRIVE_FILE_NAME + "' and '" + folderId + "' in parents and trashed = false";
+  var url = "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(q) + "&fields=files(id,name)&pageSize=5";
+  return agendaFetch(url, { headers: { "Authorization": "Bearer " + at } }).then(function (data) {
+    var files = (data && Array.isArray(data.files)) ? data.files : [];
+    return files.length > 0 ? files[0] : null;
+  });
+}
+function driveCreateFile(at, folderId, content) {
+  var boundary = "TRB" + Date.now().toString(36);
+  var meta = JSON.stringify({ name: DRIVE_FILE_NAME, parents: [folderId], mimeType: "application/json" });
+  var body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n"
+    + meta + "\r\n--" + boundary + "\r\nContent-Type: application/json\r\n\r\n"
+    + content + "\r\n--" + boundary + "--";
+  return agendaFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + at,
+      "Content-Type": "multipart/related; boundary=" + boundary
+    },
+    body: body
+  }).then(function (f) {
+    if (!f || f.error || !f.id) throw new Error("upload refusé");
+    return f;
+  });
+}
+function driveUpdateFile(at, fileId, content) {
+  return agendaFetch("https://www.googleapis.com/upload/drive/v3/files/" + encodeURIComponent(fileId) + "?uploadType=media", {
+    method: "PATCH",
+    headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" },
+    body: content
+  }).then(function (f) {
+    if (!f || f.error || !f.id) throw new Error("mise à jour refusée");
+    return f;
+  });
+}
+function saveAgendaCfg() {
+  var cid = (document.getElementById("aCid").value || "").trim();
+  var csec = (document.getElementById("aSecret").value || "").trim();
+  var refresh = (document.getElementById("aRefresh").value || "").trim();
+  if (!cid || !refresh) { showToast("⚠️ Client ID et Refresh Token obligatoires"); return false; }
+  state.cfg = Object.assign({}, state.cfg || {}, { cid: cid, csec: csec, refresh: refresh });
+  save();
+  return true;
+}
+
+// ---------- Configuration Drive (sauvegarde taffbmpm) ----------
+function driveCfgOk() {
+  var cfg = state.cfg || {};
+  return !!(cfg.dCid && cfg.dRefresh);
+}
+function driveSaveCfg() {
+  var cid = (document.getElementById("dCid").value || "").trim();
+  var csec = (document.getElementById("dSecret").value || "").trim();
+  var refresh = (document.getElementById("dRefresh").value || "").trim();
+  var folder = (document.getElementById("dFolder").value || "").trim();
+  if (!cid || !refresh) { showToast("⚠️ Client ID et Refresh Token Drive obligatoires"); return false; }
+  state.cfg = Object.assign({}, state.cfg || {}, {
+    dCid: cid, dSecret: csec, dRefresh: refresh,
+    dFolder: folder || DRIVE_DEFAULT_FOLDER
+  });
+  save();
+  renderAll();
+  showToast("💾 Sauvegarde Drive configurée — dossier " + driveFolderName());
+  return true;
+}
+function driveDisconnect() {
+  if (state.cfg) {
+    state.cfg = Object.assign({}, state.cfg, { dCid: null, dSecret: null, dRefresh: null, dFolder: null });
+  }
+  save();
+  renderAll();
+  showToast("🔌 Sauvegarde Drive déconnectée");
+}
+function agendaDisconnect() {
+  if (state.cfg) state.cfg = Object.assign({}, state.cfg, { cid: null, csec: null, refresh: null });
+  state.agendaCache = null;
+  save();
+  renderAll();
+  showToast("🔌 Agenda déconnecté");
+}
+function eventToTask(evId) {
+  var ev = findEvent(evId);
+  if (!ev) return false;
+  var note = "";
+  if (!ev.allDay) {
+    note = "🕒 " + ev.startT + "–" + ev.endT;
+    if (ev.loc) note += " · " + ev.loc;
+  } else if (ev.loc) {
+    note = "📍 " + ev.loc;
+  }
+  var type = (ev.color === "11") ? "pro" : "perso";
+  addTask(ev.title, note, "urgent", ev.day, type);
+  showToast("✅ Tâche créée : " + ev.title);
+  renderAll();
+  return true;
+}
+
+// ---------- Rendu ----------
+function renderTabs() {
+  var c = counts();
+  var html = "";
+  TABS.forEach(function (k) {
+    html += '<div class="tab ' + (tab === k ? "active " + k : "") + '" onclick="setTab(\'' + k + '\')">'
+      + CAT_LABELS[k] + '<span class="n">' + c[k] + "</span></div>";
+  });
+  document.getElementById("tabbar").innerHTML = html;
+}
+function taskHtml(t) {
+  var meta = [];
+  if (t.deferredFrom) meta.push('<span class="rep">➡️ reportée du ' + fmtDate(t.deferredFrom) + "</span>");
+  var dh = dueHtml(t);
+  if (dh) meta.push(dh);
+  meta.push("créée le " + fmtDate(t.createdAt));
+  var metaHtml = '<div class="meta">' + meta.join(" · ") + "</div>";
+  var noteHtml = t.note ? '<div class="note">' + esc(t.note) + "</div>" : "";
+  if (t.cat === "done") {
+    return '<div class="task done">'
+      + '<div class="body"><div class="title"><span class="tp">' + (t.type === "pro" ? "🔴" : "🔵") + "</span>" + esc(t.title) + "</div>" + noteHtml
+      + '<div class="meta">✅ faite le ' + fmtDate(t.doneAt) + "</div></div>"
+      + '<div class="acts">'
+      + '<button onclick="reactivateTask(\'' + t.id + "');renderAll()\">↩️ Réactiver</button>"
+      + '<button' + (armed[t.id] ? ' class="armed"' : "") + ' onclick="onDelete(\'' + t.id + "')\">" + (armed[t.id] ? "Confirmer ?" : "🗑️") + "</button>"
+      + "</div></div>";
+  }
+  return '<div class="task ' + t.cat + '">'
+    + '<button class="chk" title="Marquer faite" onclick="completeTask(\'' + t.id + "');renderAll()\">✓</button>"
+    + '<div class="body"><div class="title"><span class="tp">' + (t.type === "pro" ? "🔴" : "🔵") + "</span>" + esc(t.title) + "</div>" + noteHtml + metaHtml + "</div>"
+    + '<div class="acts">'
+    + '<button title="Reporter" onclick="deferTask(\'' + t.id + "');renderAll()\">⬅️</button>"
+    + '<button title="Modifier" onclick="openModal(\'' + t.id + "')\">✏️</button>"
+    + '<button' + (armed[t.id] ? ' class="armed"' : "") + ' title="Supprimer" onclick="onDelete(\'' + t.id + "')\">" + (armed[t.id] ? "Confirmer ?" : "🗑️") + "</button>"
+    + "</div></div>";
+}
+function renderTasksTab() {
+  promoteOverdue();
+  var el = document.getElementById("list");
+  if (tab === "lists") { el.innerHTML = listsOverviewHtml(); return; }
+  var tasks;
+  if (tab === "done") {
+    tasks = state.tasks.filter(function (t) { return t.cat === "done"; })
+      .sort(function (a, b) { return String(b.doneAt || "") < String(a.doneAt || "") ? -1 : 1; });
+  } else {
+    tasks = state.tasks.filter(function (t) { return t.cat === tab; }).sort(cmpTasks);
+  }
+  var html = "";
+  if (tasks.length === 0) {
+    html = '<div class="empty">' + (tab === "done" ? "Rien de terminé pour l'instant."
+      : "Rien ici — appuie sur ＋ pour ajouter.") + "</div>";
+  } else {
+    tasks.forEach(function (t) { html += taskHtml(t); });
+  }
+  el.innerHTML = html;
+  renderDriveCard();
+}
+function renderDriveCard() {
+  var el = document.getElementById("driveCard");
+  if (!el) return;
+  var cfg = state.cfg || {};
+  if (!cfg.dCid || !cfg.dRefresh) {
+    el.innerHTML = '<div class="lbl">☁️ Sauvegarde Google Drive — dossier « ' + esc(DRIVE_DEFAULT_FOLDER) + ' »</div>'
+      + '<div class="hint">Sauvegarde tes tâches et listes dans le dossier <b>' + esc(DRIVE_DEFAULT_FOLDER) + '</b> de ton Drive. '
+      + 'Réutilise le Refresh Token de l\'app Patrimoine (scope <code>https://www.googleapis.com/auth/drive.file</code>).</div>'
+      + '<input id="dCid" placeholder="Client ID Google">'
+      + '<input id="dSecret" placeholder="Client Secret (optionnel)" type="password">'
+      + '<input id="dRefresh" placeholder="Refresh Token (drive.file — même que Patrimoine)" type="password">'
+      + '<input id="dFolder" placeholder="Nom du dossier Drive (défaut : ' + esc(DRIVE_DEFAULT_FOLDER) + ')">'
+      + '<div class="btns"><button onclick="driveSaveCfg()">💾 Enregistrer et connecter</button></div>';
+    return;
+  }
+  el.innerHTML = '<div class="lbl">☁️ Sauvegarde Drive : dossier « ' + esc(cfg.dFolder || DRIVE_DEFAULT_FOLDER) + ' » — ' + esc(DRIVE_FILE_NAME) + '</div>'
+    + '<div class="btns">'
+    + '<button onclick="driveBackupNow()">☁️ Sauvegarder maintenant</button>'
+    + '<button onclick="driveRestoreNow()">📥 Restaurer depuis Drive</button>'
+    + '<button onclick="driveDisconnect()">Déconnecter</button>'
+    + "</div>";
+}
+function listCardHtml(l, isSub) {
+  var pr = listProgress(l);
+  var pct = pr.total > 0 ? Math.round(100 * pr.done / pr.total) : 0;
+  var kids = state.lists.filter(function (c) { return c.parent === l.id; });
+  var subNote = (!isSub && kids.length > 0) ? '<div class="subn">📁 ' + kids.length + " sous-liste(s)</div>" : "";
+  return '<div class="listcard' + (isSub ? " sub" : "") + '">'
+    + '<div class="name" onclick="openList(\'' + l.id + "')\">" + esc(l.name) + "</div>"
+    + subNote
+    + '<div class="row"><div class="bar"><div style="width:' + pct + '%"></div></div>'
+    + '<span class="cnt">' + pr.done + "/" + pr.total + " ✓</span></div>"
+    + '<div class="acts">'
+    + '<button onclick="openList(\'' + l.id + "')\">Ouvrir</button>"
+    + '<button title="Dupliquer (cochages remis à zéro)" onclick="duplicateList(\'' + l.id + "');renderAll()\">📋 Dupliquer</button>"
+    + '<button' + (armed["L:" + l.id] ? ' class="armed"' : "") + ' onclick="onDeleteList(\'' + l.id + "')\">" + (armed["L:" + l.id] ? "Confirmer ?" : "🗑️") + "</button>"
+    + "</div></div>";
+}
+function listsOverviewHtml() {
+  var html = "";
+  if (state.lists.length === 0) {
+    return '<div class="empty">Aucune liste — appuie sur ＋ (ex : « Matériel manœuvre »).</div>';
+  }
+  var roots = state.lists.filter(function (l) { return !l.parent || !getList(l.parent); });
+  roots.forEach(function (l) {
+    html += listCardHtml(l, false);
+    state.lists.filter(function (c) { return c.parent === l.id; }).forEach(function (c) {
+      html += listCardHtml(c, true);
+    });
+  });
+  return html;
+}
+function renderListDetail() {
+  var el = document.getElementById("listDetail");
+  var l = getList(currentListId || "");
+  if (!l) { showView("tasks"); return; }
+  var pr = listProgress(l);
+  var pct = pr.total > 0 ? Math.round(100 * pr.done / pr.total) : 0;
+  var html = '<div class="ld-head">'
+    + '<button class="rowbtn" onclick="closeList()">← Listes</button>'
+    + '<div class="t"><h2>' + esc(l.name) + '</h2><span class="cnt">' + pr.done + "/" + pr.total + " ✓</span></div>"
+    + '<div class="bar" style="width:70px"><div style="width:' + pct + '%"></div></div>'
+    + '<button class="rowbtn" title="Renommer" onclick="openListModal(\'' + l.id + "')\">✏️</button>"
+    + "</div>";
+  if (l.items.length === 0) {
+    html += '<div class="empty">Liste vide — ajoute ton premier élément ci-dessous.</div>';
+  }
+  l.items.forEach(function (it) {
+    html += '<div class="item">'
+      + '<button class="chk' + (it.done ? " on" : "") + '" onclick="toggleItem(\'' + l.id + "','" + it.id + "');renderAll()\">" + (it.done ? "✓" : "") + "</button>"
+      + '<div class="txt' + (it.done ? " done" : "") + '">' + esc(it.text) + "</div>"
+      + '<button class="del" onclick="deleteItem(\'' + l.id + "','" + it.id + "');renderAll()\">✕</button>"
+      + "</div>";
+  });
+  html += '<div class="addrow">'
+    + '<input type="text" id="itemInput" placeholder="Ajouter un élément…" onkeydown="if(event.key===\'Enter\'){addItemFromInput()}">'
+    + '<button onclick="addItemFromInput()">＋</button>'
+    + "</div>";
+  var subs = state.lists.filter(function (c) { return c.parent === l.id; });
+  if (subs.length > 0) {
+    html += '<div class="flabel" style="margin-top:14px">📁 Sous-listes</div><div class="subchips">';
+    subs.forEach(function (c) {
+      var prc = listProgress(c);
+      html += '<button onclick="openList(\'' + c.id + "')\">" + esc(c.name) + " · " + prc.done + "/" + prc.total + "</button>";
+    });
+    html += "</div>";
+  }
+  html += '<div class="ld-foot">'
+    + '<button onclick="resetChecks(\'' + l.id + "');renderAll()\">🔁 Tout décocher</button>"
+    + '<button onclick="duplicateList(\'' + l.id + "');renderAll()\">📋 Dupliquer</button>"
+    + '<button onclick="openListModal(null,\'' + l.id + "')\">➕ Sous-liste</button>"
+    + '<button' + (armed["L:" + l.id] ? ' class="armed"' : "") + ' onclick="onDeleteList(\'' + l.id + "')\">" + (armed["L:" + l.id] ? "Confirmer ?" : "🗑️ Supprimer") + "</button>"
+    + "</div>";
+  el.innerHTML = html;
+}
+function addItemFromInput() {
+  var inp = document.getElementById("itemInput");
+  if (!inp || !currentListId) return;
+  var v = (inp.value || "").trim();
+  if (!v) return;
+  addItem(currentListId, v);
+  renderAll();
+}
+function closeList() {
+  currentListId = null;
+  showView("tasks");
+}
+function renderAgenda() {
+  var el = document.getElementById("agBody");
+  if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) {
+    el.innerHTML = '<div class="cfg-card">'
+      + '<div class="h">🔌 Connecter mon agenda Google</div>'
+      + '<div class="hint">Lecture de tes événements (7 jours) <b>et écriture</b> : une tâche peut être '
+      + 'placée dans ton agenda d\'un seul bouton.<br>Les tâches 🔴 <b>pro</b> créent un événement <b>rouge</b> '
+      + 'dans l\'agenda, les tâches 🔵 <b>perso</b> un événement <b>bleu</b>.<br>Récupère un Refresh Token sur <b>OAuth Playground</b> '
+      + 'avec le scope :<br><code>https://www.googleapis.com/auth/calendar</code><br>'
+      + '(la même marche à suivre que la sauvegarde Drive de l\'app Patrimoine, avec ce scope-là — '
+      + 'il couvre lecture ET écriture).</div>'
+      + '<input id="aCid" placeholder="Client ID Google">'
+      + '<input id="aSecret" placeholder="Client Secret (optionnel pour certains clients)" type="password">'
+      + '<input id="aRefresh" placeholder="Refresh Token (OAuth Playground)" type="password">'
+      + '<div class="ag-actions">'
+      + '<button onclick="if(saveAgendaCfg()){agendaRefresh();}">💾 Enregistrer et tester</button>'
+      + "</div></div>";
+    return;
+  }
+  var evs = (state.agendaCache && state.agendaCache.events) || [];
+  var html = '<div class="ag-actions">'
+    + '<button onclick="agendaRefresh()">🔄 Actualiser (7 jours)</button>'
+    + '<button onclick="agendaDisconnect()">Déconnecter</button>'
+    + "</div>";
+  if (evs.length === 0) {
+    html += '<div class="empty">Aucun événement chargé — appuie sur 🔄 Actualiser.<br>'
+      + 'Sur chaque événement, ＋ crée une tâche avec sa date et ses horaires.</div>';
+  }
+  var days = {};
+  evs.forEach(function (e) { (days[e.day] = days[e.day] || []).push(e); });
+  Object.keys(days).sort().forEach(function (day) {
+    html += '<div class="day-h">📅 ' + dayLabel(day) + " <small>" + fmtDate(day) + "</small></div>";
+    days[day].forEach(function (e) {
+      var when = e.allDay ? "journée entière" : "🕒 " + e.startT + "–" + e.endT;
+      var loc = e.loc ? " · " + esc(e.loc) : "";
+      var dot = (e.color === "11") ? "🔴 " : ((e.color === "9") ? "🔵 " : "");
+      html += '<div class="ev"><div class="ev-b"><div class="title">' + dot + esc(e.title) + "</div>"
+        + '<div class="meta">' + when + loc + "</div></div>"
+        + '<button class="chk" title="Créer une tâche depuis cet événement" onclick="eventToTask(\'' + e.id + "')\">＋</button></div>";
+    });
+  });
+  el.innerHTML = html;
+}
+function showView(v) {
+  view = v;
+  document.getElementById("view-tasks").className = (v === "tasks") ? "wrap" : "wrap hidden";
+  document.getElementById("view-agenda").className = (v === "agenda") ? "" : "hidden";
+  document.getElementById("view-list").className = (v === "list") ? "" : "hidden";
+  document.getElementById("fab").style.display = (v === "tasks") ? "" : "none";
+  renderAll();
+}
+function setTab(k) {
+  if (TABS.indexOf(k) >= 0) tab = k;
+  renderAll();
+}
+function onFab() {
+  if (tab === "lists") openListModal();
+  else openModal();
+}
+function renderAll() {
+  renderTabs();
+  if (view === "tasks") renderTasksTab();
+  else if (view === "list") renderListDetail();
+  else renderAgenda();
+}
+
+// ---------- Modale tâche ----------
+function renderCats() {
+  var html = "";
+  ["urgent", "week", "later"].forEach(function (k) {
+    html += '<label id="lbl-' + k + '" onclick="pickCat(\'' + k + "')\"><input type=\"radio\" name=\"mCat\" id=\"mCat-" + k + '" value="' + k + '"><span>' + CAT_SHORT[k] + "</span></label>";
+  });
+  document.getElementById("mCats").innerHTML = html;
+  pickCat("urgent");
+  renderTypes();
+}
+function renderTypes() {
+  var html = "";
+  TYPES.forEach(function (k) {
+    html += '<label id="tlbl-' + k + '" onclick="pickType(\'' + k + '\')"><input type="radio" name="mType" id="mType-' + k + '" value="' + k + '"><span>' + TYPE_LABELS[k] + "</span></label>";
+  });
+  document.getElementById("mTypes").innerHTML = html;
+  pickType("perso");
+}
+function pickType(k) {
+  TYPES.forEach(function (c) {
+    var r = document.getElementById("mType-" + c);
+    var l = document.getElementById("tlbl-" + c);
+    if (r) r.checked = (c === k);
+    if (l) l.className = (c === k) ? "on" : "";
+  });
+}
+function pickCat(k) {
+  ["urgent", "week", "later"].forEach(function (c) {
+    var r = document.getElementById("mCat-" + c);
+    var l = document.getElementById("lbl-" + c);
+    if (r) r.checked = (c === k);
+    if (l) l.className = (c === k) ? "on" : "";
+  });
+}
+function openModal(id) {
+  editId = id || null;
+  var t = editId ? getTask(editId) : null;
+  document.getElementById("mLabel").textContent = t ? "Modifier la tâche" : "Nouvelle tâche";
+  document.getElementById("mTitle").value = t ? t.title : "";
+  document.getElementById("mNote").value = t ? t.note : "";
+  document.getElementById("mDue").value = t && t.due ? t.due : "";
+  var defaultCat = t ? t.cat : (tab !== "done" && tab !== "lists" ? tab : "urgent");
+  if (defaultCat === "done" || defaultCat === "lists") defaultCat = "urgent";
+  pickCat(defaultCat);
+  pickType(t ? (t.type === "pro" ? "pro" : "perso") : "perso");
+  document.getElementById("modal").className = "modal";
+}
+function closeModal() {
+  document.getElementById("modal").className = "modal hidden";
+  editId = null;
+}
+function saveModal() {
+  var title = (document.getElementById("mTitle").value || "").trim();
+  if (!title) { showToast("⚠️ Donne un titre à la tâche"); return null; }
+  var note = document.getElementById("mNote").value || "";
+  var due = document.getElementById("mDue").value || null;
+  var cat = "urgent";
+  ["urgent", "week", "later"].forEach(function (c) {
+    var r = document.getElementById("mCat-" + c);
+    if (r && r.checked) cat = c;
+  });
+  var type = "perso";
+  TYPES.forEach(function (c) {
+    var r = document.getElementById("mType-" + c);
+    if (r && r.checked) type = c;
+  });
+  var t;
+  if (editId) {
+    editTask(editId, title, note, cat, due, type);
+    t = getTask(editId);
+  } else {
+    t = addTask(title, note, cat, due, type);
+  }
+  closeModal();
+  renderAll();
+  return t;
+}
+
+// ---------- Modale liste ----------
+function openListModal(id, parentId) {
+  editListId = id || null;
+  newListParent = (!editListId && parentId && getList(parentId)) ? parentId : null;
+  var l = editListId ? getList(editListId) : null;
+  var p = newListParent ? getList(newListParent) : null;
+  document.getElementById("lLabel").textContent = l ? "Modifier la liste" : (p ? "Nouvelle sous-liste de « " + p.name + " »" : "Nouvelle liste");
+  document.getElementById("lName").value = l ? l.name : "";
+  document.getElementById("listModal").className = "modal";
+}
+function closeListModal() {
+  document.getElementById("listModal").className = "modal hidden";
+  editListId = null;
+  newListParent = null;
+}
+function saveListModal() {
+  var name = (document.getElementById("lName").value || "").trim();
+  if (!name) { showToast("⚠️ Donne un nom à la liste"); return; }
+  if (editListId) renameList(editListId, name);
+  else addList(name, newListParent);
+  newListParent = null;
+  closeListModal();
+  renderAll();
+}
+
+// ---------- Toast ----------
+var toastTimer = null;
+function showToast(msg) {
+  var el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "show";
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.className = ""; }, 2600);
+}
+
+// ---------- Démarrage ----------
+document.getElementById("vBadge").textContent = APP_VERSION;
+renderCats();
+showView("tasks");
+if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().then(function (ok) {
+    var lbl = document.getElementById("persistLbl");
+    if (lbl) lbl.textContent = ok
+      ? "💾 Sauvegarde automatique sur cet appareil (stockage persistant actif)."
+      : "💾 Sauvegarde automatique sur cet appareil. Fais un export régulier par sécurité.";
+  }).catch(function () {});
+}
+if ('serviceWorker' in navigator) {
+  addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
