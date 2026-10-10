@@ -108,6 +108,22 @@
     background: #a78bfa; border: none; color: #020617; font-weight: 700;
     border-radius: 10px; padding: 10px 14px; font-size: 14px; cursor: pointer;
   }
+  .addrow .sectgl {
+    background: #0f172a; border: 1px dashed #fbbf24; color: #94a3b8; padding: 10px 12px;
+  }
+  .addrow .sectgl.on { background: #fbbf24; color: #020617; border-style: solid; }
+  .item .min { background: transparent; border: none; color: #64748b; cursor: pointer; padding: 2px 3px; font-size: 13px; }
+  .item .min:disabled { opacity: 0.25; cursor: default; }
+  .item .qty { color: #38bdf8; font-weight: 700; }
+  .item .masked { color: #94a3b8; letter-spacing: 2px; }
+  .item.secret { border-left: 3px dashed #fbbf24; }
+  .listcard .tpl { font-size: 10px; color: #fbbf24; border: 1px solid #fbbf24; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+  .searchrow { display: flex; gap: 8px; padding: 0 12px 8px; max-width: 560px; margin: 0 auto; }
+  .searchrow input {
+    flex: 1; background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 9px 12px; font-size: 14px; font-family: inherit;
+  }
+  .searchrow button { background: #1e293b; border: none; color: #94a3b8; border-radius: 10px; padding: 0 12px; cursor: pointer; }
   .ld-head { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
   .ld-head .t { flex: 1; min-width: 0; }
   .ld-head h2 { font-size: 17px; word-wrap: break-word; }
@@ -266,6 +282,10 @@
 </header>
 <div id="view-tasks" class="wrap">
   <nav id="tabbar"></nav>
+  <div class="searchrow">
+    <input type="text" id="searchInput" placeholder="🔍 Rechercher une tâche, une note, une liste…" oninput="setSearch(this.value)">
+    <button id="searchClear" class="hidden" onclick="setSearch('')">✕</button>
+  </div>
   <div id="warnCard"></div>
   <main id="list"></main>
   <div class="data-card">
@@ -362,8 +382,8 @@
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v5 : sync bidirectionnelle agenda↔tâches, multi-jours, file hors-ligne, fenêtre 30 j réglable, sauvegarde Drive auto + fusion PC/téléphone =====
-var APP_VERSION = "v6";
+// ===== Tâches & Relances — v7 : édition d'événements agenda, agenda lisible par jour, quantités/modèles/codes masqués dans les listes, recherche =====
+var APP_VERSION = "v7";
 var KEY = "taches-relances-v2";
 var TABS = ["urgent", "week", "later", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -575,6 +595,39 @@ var editId = null;         // tâche éditée
 var editListId = null;     // liste éditée
 var newListParent = null;  // parent de la prochaine sous-liste créée
 var armed = {};            // suppressions à confirmer (id -> timestamp)
+var searchQ = "";         // recherche live (tâches + listes), non persistée
+var revealed = {};         // codes révélés (transitoire, jamais persisté)
+var secretNext = false;    // mode « prochain élément = code masqué »
+
+// ---------- Recherche live ----------
+function setSearch(v) {
+  searchQ = String(v || "").trim().toLowerCase();
+  var c = document.getElementById("searchClear");
+  if (c) c.className = searchQ ? "" : "hidden";
+  renderAll();
+}
+
+// ---------- Copier dans le presse-papier (SMS, WhatsApp…) ----------
+function copyText(txt, msg) {
+  function fallback() {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand && document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (ok) showToast(msg || "📋 Copié");
+      else showToast("⚠️ Copie impossible — sélectionne à la main");
+    } catch (e) { showToast("⚠️ Copie impossible"); }
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function () { showToast(msg || "📋 Copié"); }, function () { fallback(); });
+      return;
+    }
+  } catch (e) {}
+  fallback();
+}
 
 // ---------- Urgence : échéances ----------
 function promoteOverdue() {
@@ -753,10 +806,17 @@ function deleteList(id) {
   if (n > 0) save();
   return n > 0;
 }
-function addItem(listId, text) {
+// « 4x pulkas » / « 4 × pulkas » → quantité 4, texte « pulkas »
+function parseQty(text) {
+  var m = String(text).match(/^(\d{1,3})\s*[x×]\s*(.+)$/i);
+  if (!m) return { qty: null, text: String(text) };
+  return { qty: parseInt(m[1], 10), text: m[2] };
+}
+function addItem(listId, text, secret) {
   var l = getList(listId);
   if (!l) return null;
-  var it = { id: uid(), text: text, done: false };
+  var pq = parseQty(text);
+  var it = { id: uid(), text: pq.text, done: false, qty: pq.qty, secret: secret === true };
   l.items.push(it);
   save();
   return it;
@@ -777,6 +837,19 @@ function deleteItem(listId, itemId) {
   if (n > 0) save();
   return n > 0;
 }
+// réordonner : ▲▼ (dir = -1 / +1), sans effet en bord de liste
+function moveItem(listId, itemId, dir) {
+  var l = getList(listId);
+  if (!l) return false;
+  var i = -1;
+  for (var k = 0; k < l.items.length; k++) { if (l.items[k].id === itemId) { i = k; break; } }
+  if (i < 0) return false;
+  var j = i + (dir < 0 ? -1 : 1);
+  if (j < 0 || j >= l.items.length) return false;
+  var tmp = l.items[i]; l.items[i] = l.items[j]; l.items[j] = tmp;
+  save();
+  return true;
+}
 function resetChecks(listId) {
   var l = getList(listId);
   if (!l) return false;
@@ -792,11 +865,75 @@ function duplicateList(listId) {
     name: src.name + " (copie)",
     createdAt: today(),
     parent: src.parent || null,
-    items: src.items.map(function (it) { return { id: uid(), text: it.text, done: false }; })
+    template: false, // une copie n'est jamais un modèle
+    items: src.items.map(function (it) { return { id: uid(), text: it.text, done: false, qty: it.qty || null, secret: it.secret === true }; })
   };
   state.lists.unshift(copy);
   save();
   return copy;
+}
+// liste figée comme modèle → « ➕ Nouvelle depuis » crée une copie neuve pour chaque exercice
+function toggleTemplate(id) {
+  var l = getList(id);
+  if (!l) return false;
+  l.template = !(l.template === true);
+  save();
+  renderAll();
+  showToast(l.template ? "📌 « " + l.name + " » gardée comme modèle — « ➕ Nouvelle depuis » à chaque exercice" : "📌 Modèle désactivé");
+  return true;
+}
+function newFromTemplate(id) {
+  var src = getList(id);
+  if (!src) return null;
+  var copy = {
+    id: uid(),
+    name: src.name + " — " + fmtDate(today()),
+    createdAt: today(),
+    parent: src.parent || null,
+    template: false, // la nouvelle liste n'est pas un modèle
+    items: src.items.map(function (it) { return { id: uid(), text: it.text, done: false, qty: it.qty || null, secret: it.secret === true }; })
+  };
+  state.lists.unshift(copy);
+  save();
+  openList(copy.id);
+  showToast("📋 Liste créée depuis le modèle — cochages à zéro");
+  return copy;
+}
+// copier une liste en texte (SMS, WhatsApp…) — les codes restent masqués
+function copyListText(listId) {
+  var l = getList(listId);
+  if (!l) return false;
+  var lines = ["📋 " + l.name];
+  l.items.forEach(function (it) {
+    var box = it.done ? "☒" : "☐";
+    var q = it.qty ? it.qty + " × " : "";
+    var val = it.secret ? "•••••• (code masqué)" : it.text;
+    lines.push(box + " " + q + val);
+  });
+  if (l.items.length === 0) lines.push("(liste vide)");
+  copyText(lines.join("\n"), "📤 Liste copiée — colle-la dans un SMS, WhatsApp…");
+  return true;
+}
+// codes masqués : révélation transitoire + copie sans révéler à l'écran
+function toggleReveal(itemId) {
+  revealed[itemId] = !revealed[itemId];
+  renderAll();
+}
+function toggleSecretNext() {
+  secretNext = !secretNext;
+  renderAll();
+  showToast(secretNext ? "🔐 Mode code masqué : le prochain élément sera masqué ••••••" : "Mode code masqué désactivé");
+}
+function copyItemSecret(listId, itemId) {
+  var l = getList(listId);
+  if (!l) return false;
+  for (var i = 0; i < l.items.length; i++) {
+    if (l.items[i].id === itemId) {
+      copyText(l.items[i].text, "📋 Code copié — colle-le où tu veux");
+      return true;
+    }
+  }
+  return false;
 }
 function listProgress(l) {
   var done = 0;
@@ -821,7 +958,7 @@ function openList(id) {
 // ---------- Export / Import ----------
 function exportData() {
   return {
-    app: "taches-relances", version: 5, tasks: state.tasks, lists: state.lists,
+    app: "taches-relances", version: 7, tasks: state.tasks, lists: state.lists,
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     savedAt: Date.now()
   };
@@ -855,8 +992,15 @@ function normalizeListIn(l) {
     name: l.name,
     createdAt: l.createdAt || today(),
     parent: (typeof l.parent === "string" && l.parent) ? l.parent : null,
+    template: l.template === true,
     items: (Array.isArray(l.items) ? l.items : []).filter(function (it) { return it && typeof it.text === "string"; }).map(function (it) {
-      return { id: (typeof it.id === "string" && it.id) ? it.id : uid(), text: it.text, done: it.done === true };
+      return {
+        id: (typeof it.id === "string" && it.id) ? it.id : uid(),
+        text: it.text,
+        done: it.done === true,
+        qty: (typeof it.qty === "number" && it.qty > 0 && it.qty < 1000) ? it.qty : null,
+        secret: it.secret === true
+      };
     })
   };
 }
@@ -1562,7 +1706,18 @@ function taskHtml(t) {
 function renderTasksTab() {
   promoteOverdue();
   var el = document.getElementById("list");
-  if (tab === "lists") { el.innerHTML = listsOverviewHtml(); return; }
+  if (tab === "lists") { el.innerHTML = listsOverviewHtml(); renderDriveCard(); return; }
+  if (searchQ) {
+    var res = state.tasks.filter(function (t) {
+      return (String(t.title).toLowerCase().indexOf(searchQ) >= 0)
+        || (String(t.note || "").toLowerCase().indexOf(searchQ) >= 0);
+    }).sort(cmpTasks);
+    var h = '<div class="empty">🔎 ' + res.length + " résultat(s) pour « " + esc(searchQ) + " »</div>";
+    res.forEach(function (t) { h += taskHtml(t); });
+    el.innerHTML = h;
+    renderDriveCard();
+    return;
+  }
   var tasks;
   if (tab === "done") {
     tasks = state.tasks.filter(function (t) { return t.cat === "done"; })
@@ -1634,12 +1789,15 @@ function listCardHtml(l, isSub) {
   var pct = pr.total > 0 ? Math.round(100 * pr.done / pr.total) : 0;
   var kids = state.lists.filter(function (c) { return c.parent === l.id; });
   var subNote = (!isSub && kids.length > 0) ? '<div class="subn">📁 ' + kids.length + " sous-liste(s)</div>" : "";
+  var tplBadge = (l.template === true) ? '<span class="tpl">📋 modèle</span>' : "";
+  var tplBtn = (l.template === true) ? '<button title="Créer une liste neuve depuis ce modèle (cochages à zéro)" onclick="newFromTemplate(\'' + l.id + "')\">➕ Nouvelle depuis</button>" : "";
   return '<div class="listcard' + (isSub ? " sub" : "") + '">'
-    + '<div class="name" onclick="openList(\'' + l.id + "')\">" + esc(l.name) + "</div>"
+    + '<div class="name" onclick="openList(\'' + l.id + "')\">" + esc(l.name) + tplBadge + "</div>"
     + subNote
     + '<div class="row"><div class="bar"><div style="width:' + pct + '%"></div></div>'
     + '<span class="cnt">' + pr.done + "/" + pr.total + " ✓</span></div>"
     + '<div class="acts">'
+    + tplBtn
     + '<button onclick="openList(\'' + l.id + "')\">Ouvrir</button>"
     + '<button title="Dupliquer (cochages remis à zéro)" onclick="duplicateList(\'' + l.id + "');renderAll()\">📋 Dupliquer</button>"
     + '<button' + (armed["L:" + l.id] ? ' class="armed"' : "") + ' onclick="onDeleteList(\'' + l.id + "')\">" + (armed["L:" + l.id] ? "Confirmer ?" : "🗑️") + "</button>"
@@ -1647,13 +1805,21 @@ function listCardHtml(l, isSub) {
 }
 function listsOverviewHtml() {
   var html = "";
-  if (state.lists.length === 0) {
+  var lists = state.lists;
+  if (searchQ) {
+    lists = state.lists.filter(function (l) {
+      if (String(l.name).toLowerCase().indexOf(searchQ) >= 0) return true;
+      return (l.items || []).some(function (it) { return String(it.text).toLowerCase().indexOf(searchQ) >= 0; });
+    });
+    if (lists.length === 0) return '<div class="empty">🔎 Aucune liste ne correspond à « ' + esc(searchQ) + ' ».</div>';
+    html += '<div class="empty">🔎 ' + lists.length + " liste(s) trouvée(s)</div>";
+  } else if (state.lists.length === 0) {
     return '<div class="empty">Aucune liste — appuie sur ＋ (ex : « Matériel manœuvre »).</div>';
   }
-  var roots = state.lists.filter(function (l) { return !l.parent || !getList(l.parent); });
+  var roots = lists.filter(function (l) { return !l.parent || !getList(l.parent); });
   roots.forEach(function (l) {
     html += listCardHtml(l, false);
-    state.lists.filter(function (c) { return c.parent === l.id; }).forEach(function (c) {
+    lists.filter(function (c) { return c.parent === l.id; }).forEach(function (c) {
       html += listCardHtml(c, true);
     });
   });
@@ -1674,15 +1840,26 @@ function renderListDetail() {
   if (l.items.length === 0) {
     html += '<div class="empty">Liste vide — ajoute ton premier élément ci-dessous.</div>';
   }
-  l.items.forEach(function (it) {
-    html += '<div class="item">'
+  l.items.forEach(function (it, idx) {
+    var masked = it.secret && !revealed[it.id];
+    var txtHtml = it.qty ? '<span class="qty">' + it.qty + " × </span>" : "";
+    if (masked) txtHtml += '<span class="masked">••••••</span>';
+    else txtHtml += esc(it.text);
+    html += '<div class="item' + (it.secret ? " secret" : "") + '">'
       + '<button class="chk' + (it.done ? " on" : "") + '" onclick="toggleItem(\'' + l.id + "','" + it.id + "');renderAll()\">" + (it.done ? "✓" : "") + "</button>"
-      + '<div class="txt' + (it.done ? " done" : "") + '">' + esc(it.text) + "</div>"
+      + '<div class="txt' + (it.done ? " done" : "") + '">' + txtHtml + "</div>"
+      + (it.secret
+        ? '<button class="min" title="' + (masked ? "Révéler" : "Masquer") + '" onclick="toggleReveal(\'' + it.id + "')\">" + (masked ? "👁" : "🙈") + "</button>"
+          + '<button class="min" title="Copier le code (sans le montrer à l\'écran)" onclick="copyItemSecret(\'' + l.id + "','" + it.id + '\')">📋</button>'
+        : "")
+      + '<button class="min" title="Monter"' + (idx === 0 ? " disabled" : "") + ' onclick="moveItem(\'' + l.id + "','" + it.id + '\',-1);renderAll()">▲</button>'
+      + '<button class="min" title="Descendre"' + (idx === l.items.length - 1 ? " disabled" : "") + ' onclick="moveItem(\'' + l.id + "','" + it.id + '\',1);renderAll()">▼</button>'
       + '<button class="del" onclick="deleteItem(\'' + l.id + "','" + it.id + "');renderAll()\">✕</button>"
       + "</div>";
   });
   html += '<div class="addrow">'
-    + '<input type="text" id="itemInput" placeholder="Ajouter un élément…" onkeydown="if(event.key===\'Enter\'){addItemFromInput()}">'
+    + '<input type="text" id="itemInput" placeholder="' + (secretNext ? "Ajouter un code (masqué ••••)…" : "Ajouter un élément… (« 4x pulkas » = quantité)") + '" onkeydown="if(event.key===\'Enter\'){addItemFromInput()}">'
+    + '<button class="sectgl' + (secretNext ? " on" : "") + '" title="Mode code masqué : le prochain élément sera masqué ••••" onclick="toggleSecretNext()">🔐</button>'
     + '<button onclick="addItemFromInput()">＋</button>'
     + "</div>";
   var subs = state.lists.filter(function (c) { return c.parent === l.id; });
@@ -1696,7 +1873,9 @@ function renderListDetail() {
   }
   html += '<div class="ld-foot">'
     + '<button onclick="resetChecks(\'' + l.id + "');renderAll()\">🔁 Tout décocher</button>"
+    + '<button onclick="copyListText(\'' + l.id + "')\">📤 Copier en texte</button>"
     + '<button onclick="duplicateList(\'' + l.id + "');renderAll()\">📋 Dupliquer</button>"
+    + '<button onclick="toggleTemplate(\'' + l.id + "')\">" + (l.template === true ? "📌 Modèle : ✅ ON" : "📌 Garder comme modèle") + "</button>"
     + '<button onclick="openListModal(null,\'' + l.id + "')\">➕ Sous-liste</button>"
     + '<button' + (armed["L:" + l.id] ? ' class="armed"' : "") + ' onclick="onDeleteList(\'' + l.id + "')\">" + (armed["L:" + l.id] ? "Confirmer ?" : "🗑️ Supprimer") + "</button>"
     + "</div>";
@@ -1707,7 +1886,8 @@ function addItemFromInput() {
   if (!inp || !currentListId) return;
   var v = (inp.value || "").trim();
   if (!v) return;
-  addItem(currentListId, v);
+  addItem(currentListId, v, secretNext);
+  secretNext = false;
   renderAll();
 }
 function closeList() {
