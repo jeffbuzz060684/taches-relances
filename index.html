@@ -531,8 +531,8 @@
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v16.1 (revues v16, affaire confirmée chez Google) : suppression PROUVÉE aussi par status "cancelled" (soft-delete Google : un événement supprimé reste lisible, le 404 ne vient qu'après purge), tâche modifiée à la main vérifiée pour le badge « disparu » mais JAMAIS retirée, déplacé hors fenêtre TOTALEMENT suivi (heures, note, trace, save() Drive), toast distinct injoignable/déplacé, verrou Drive expirable 2 min, rotation : files.delete = définitif + retry de création, doublon trace taskId null, Aujourd'hui trié par horaire =====
-var APP_VERSION = "v16.1";
+// ===== Tâches & Relances — v16.2 (demande Jade : « synchronise directement, le bouton reste en cas de sécurité ») : synchro agenda AUTOMATIQUE — rafraîchissement silencieux dès que le cache dépasse 5 min, heartbeat 1 min tant que l'app est ouverte au premier plan (jamais en arrière-plan : le retour au premier plan resynchro déjà), verrou anti-chevauchement agendaAutoBusy, garde 1 essai/min conservée, bouton 🔄 Actualiser CONSERVÉ en secours =====
+var APP_VERSION = "v16.2";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -1373,7 +1373,7 @@ function keepLocalSecrets(merged, oldList) { // v15 : réinjecte les codes 🔐 
 }
 function exportData() {
   return {
-    app: "taches-relances", version: 16.1, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version >= 16 = marqueur de rotation Drive (les fichiers v16+ n'ont plus de codes 🔐 dans leur historique)
+    app: "taches-relances", version: 16.2, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version >= 16 = marqueur de rotation Drive (les fichiers v16+ n'ont plus de codes 🔐 dans leur historique)
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     tombstones: state.tombstones || [],
     savedAt: Date.now()
@@ -1770,14 +1770,17 @@ function importAllNow() {
     ? "⚠️ Rien de nouveau : " + ghosts + " événement(s) converti(s) puis supprimé(s) — ré-ajoutables un par un via ＋"
     : "⚠️ Tout est déjà importé");
 }
-// Actualisation silencieuse si l'agenda n'a pas été rafraîchi depuis plus de 15 min (max 1 essai/min)
-var lastAutoFetch = 0;
+// v16.2 : synchro agenda AUTOMATIQUE — rafraîchissement silencieux dès que le cache dépasse 5 min (max 1 essai/min).
+// Le bouton 🔄 Actualiser reste là en secours : lui seul affiche le toast complet « Agenda à jour ».
+var lastAutoFetch = 0, agendaAutoBusy = false; // agendaAutoBusy : une synchro auto encore en vol n'en relance pas une 2e par-dessus
 function maybeAutoRefresh() {
   if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) return;
+  if (agendaAutoBusy) return; // réseau lent : la précédente n'a pas fini → pas de chevauchement
   var last = (state.agendaCache && state.agendaCache.fetchedAt) || 0;
-  if (Date.now() - last > 15 * 60000 && Date.now() - lastAutoFetch > 60000) {
+  if (Date.now() - last > 5 * 60000 && Date.now() - lastAutoFetch > 60000) {
     lastAutoFetch = Date.now();
-    agendaRefresh(true);
+    agendaAutoBusy = true;
+    agendaRefresh(true).then(function () { agendaAutoBusy = false; }, function () { agendaAutoBusy = false; });
   }
 }
 function saveAgendaDays(v) {
@@ -2891,7 +2894,7 @@ function renderAgenda() {
     + '<button class="' + (auto ? "on" : "") + '" onclick="toggleAutoAgenda()">' + (auto ? "📥 Import auto : ✅ ON" : "📥 Import auto : ❌ OFF") + "</button>"
     + '<button onclick="agendaDisconnect()">Déconnecter</button>'
     + "</div>"
-    + '<div class="syncline">Dernière synchro agenda : ' + fmtAgo(state.agendaCache && state.agendaCache.fetchedAt) + "</div>"
+    + '<div class="syncline">Dernière synchro agenda : ' + fmtAgo(state.agendaCache && state.agendaCache.fetchedAt) + " · ⚡ auto quand l'app est ouverte</div>"
     + '<div class="hint" style="font-size:12px;color:var(--muted);padding:0 2px 6px">'
     + (auto
       ? "✅ Import auto <b>activé</b> : chaque actualisation transforme les nouveaux événements des " + win + " prochains jours en tâches, <b>et met à jour les tâches si l'événement bouge</b> (sauf celles que tu modifies toi-même)."
@@ -3348,6 +3351,12 @@ if (typeof document !== "undefined" && document.addEventListener) {
     maybeAutoRefresh();
     retryPendingSync();
   });
+  // v16.2 : heartbeat — tant que l'app est OUVERTE au premier plan, l'agenda se resynchro tout seul (cache > 5 min).
+  // En arrière-plan le navigateur gèle le minuteur : au retour, c'est visibilitychange → maybeAutoRefresh qui resynchro.
+  var agendaTimer = setInterval(function () {
+    if (typeof document !== "undefined" && document.hidden) return; // caché : pas de réseau inutile, le retour au 1er plan s'en charge
+    maybeAutoRefresh();
+  }, 60000);
   // v13 : fermeture par le fond — sur téléphone, le doigt peut glisser entre pointerdown et click :
   // on ne ferme QUE si pointerdown ET click visent le MÊME fond de feuille (jamais un bouton dessous)
   var _bd = null;
