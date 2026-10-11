@@ -2998,3 +2998,242 @@ function applyTheme() {
   }
   var mt = (typeof document !== "undefined" && document.querySelector) ? document.querySelector('meta[name="theme-color"]') : null;
   if (mt) { try { mt.setAttribute("content", light ? "#eef2f7" : "#020617"); } catch (e) {} } // v12 : la barre système suit le thème
+  var b = document.getElementById("themeBtn");
+  if (b) b.textContent = light ? "☀️" : "🌙";
+}
+function toggleTheme() {
+  state.cfg = Object.assign({}, state.cfg || {}, { light: !(state.cfg && state.cfg.light) });
+  persist();
+  applyTheme();
+}
+
+// ---------- Badge de l'icône (retards + aujourd'hui) ----------
+function updateBadge() {
+  try {
+    var n = counts().today || 0;
+    if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n);
+    else if (navigator.clearAppBadge) navigator.clearAppBadge();
+  } catch (e) {}
+}
+
+// ---------- Modale tâche ----------
+function renderCats() { // v11 : plus de boutons de catégorie — la date classe la tâche (types pro/perso conservés)
+  renderTypes();
+}
+function renderTypes() {
+  var html = "";
+  TYPES.forEach(function (k) {
+    html += '<label id="tlbl-' + k + '" onclick="pickType(\'' + k + '\')"><input type="radio" name="mType" id="mType-' + k + '" value="' + k + '"><span>' + TYPE_LABELS[k] + "</span></label>";
+  });
+  document.getElementById("mTypes").innerHTML = html;
+  pickType("perso");
+}
+function pickType(k) {
+  TYPES.forEach(function (c) {
+    var r = document.getElementById("mType-" + c);
+    var l = document.getElementById("tlbl-" + c);
+    if (r) r.checked = (c === k);
+    if (l) l.className = (c === k) ? "on" : "";
+  });
+}
+function openModal(id) {
+  editId = id || null;
+  var t = editId ? getTask(editId) : null;
+  document.getElementById("mLabel").textContent = t ? "Modifier la tâche" : "Nouvelle tâche";
+  document.getElementById("mTitle").value = t ? t.title : "";
+  document.getElementById("mNote").value = t ? t.note : "";
+  document.getElementById("mDue").value = t && t.due ? t.due : "";
+  document.getElementById("mUntil").value = (t && t.until && t.until !== t.due) ? t.until : "";
+  document.getElementById("mStart").value = t && t.startT ? t.startT : "";
+  document.getElementById("mEnd").value = t && t.endT ? t.endT : "";
+  document.getElementById("mRep").value = (t && t.rep && t.rep.mode) ? t.rep.mode : "none";
+  document.getElementById("mRepEvery").value = (t && t.rep && t.rep.every) ? t.rep.every : "";
+  document.getElementById("mRepCount").value = (t && t.rep && t.rep.count) ? t.rep.count : "";
+  onRepChange();
+  pickType(t ? (t.type === "pro" ? "pro" : "perso") : "perso");
+  document.getElementById("modal").className = "modal";
+}
+function onRepChange() {
+  var mode = (document.getElementById("mRep") || {}).value || "none";
+  var row = document.getElementById("mRepRow");
+  if (row) row.style.display = (mode === "none") ? "none" : "flex";
+  var evIn = document.getElementById("mRepEvery");
+  if (evIn) evIn.style.display = (mode === "ndays") ? "block" : "none";
+}
+function readRepModal() {
+  var mode = (document.getElementById("mRep") || {}).value || "none";
+  if (mode === "none") return null;
+  var every = null;
+  if (mode === "ndays") every = parseInt((document.getElementById("mRepEvery") || {}).value, 10);
+  var count = parseInt((document.getElementById("mRepCount") || {}).value, 10);
+  return { mode: mode, every: isNaN(every) ? null : every, count: isNaN(count) ? null : count };
+}
+function closeModal() {
+  document.getElementById("modal").className = "modal hidden";
+  editId = null;
+}
+// Enregistrer : par défaut crée/met à jour AUSSI l'événement agenda (app + agenda en un geste).
+// saveModal(false) = enregistrer sans toucher à l'agenda.
+function saveModal(autoSync) {
+  var title = (document.getElementById("mTitle").value || "").trim();
+  if (!title) { showToast("⚠️ Donne un titre à la tâche"); return null; }
+  var note = document.getElementById("mNote").value || "";
+  var due = document.getElementById("mDue").value || null;
+  var until = ((document.getElementById("mUntil") || {}).value || "").trim() || null;
+  if (until && due && until < due) { showToast("⚠️ « Jusqu'au » doit être après la date de début"); return null; }
+  var startT = validHM(((document.getElementById("mStart") || {}).value || "").trim());
+  var endT = validHM(((document.getElementById("mEnd") || {}).value || "").trim());
+  if (startT && endT && endT <= startT) { showToast("⚠️ L'heure de fin doit être après l'heure de début"); return null; }
+  var rep = readRepModal();
+  if (rep && rep.mode === "ndays" && !rep.every) { showToast("⚠️ Indique « tous les combien de jours » (2, 3…)"); return null; }
+  var t0 = editId ? getTask(editId) : null;
+  var cat = due ? catForDate(due) : (t0 ? t0.cat : "later"); // v11 : la DATE classe la tâche (catégorie interne déduite, plus de boutons)
+  var type = "perso";
+  TYPES.forEach(function (c) {
+    var r = document.getElementById("mType-" + c);
+    if (r && r.checked) type = c;
+  });
+  var extra = { startT: startT, endT: endT, until: until, rep: rep };
+  var t;
+  if (editId) {
+    editTask(editId, title, note, cat, due, type, extra);
+    t = getTask(editId);
+  } else {
+    t = addTask(title, note, cat, due, type, extra);
+  }
+  closeModal();
+  renderAll();
+  if (autoSync !== false && t && !t.autoImport) {
+    if (!t.due) showToast("✅ Tâche enregistrée (sans échéance : rien à mettre dans l'agenda)");
+    else if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) showToast("✅ Tâche enregistrée (agenda non connecté)");
+    else { showToast("💾 Enregistré — 📅 synchro agenda en cours…"); taskToEvent(t.id); }
+  }
+  return t;
+}
+
+// ---------- Modale liste ----------
+function fillListEvSelect(current) { // v14 : les événements visibles de l'agenda (fenêtre en cours), triés
+  var sel = document.getElementById("lEv");
+  if (!sel) return;
+  var evs = ((state.agendaCache && state.agendaCache.events) || []).slice()
+    .sort(function (a, b) { return (a.day + (a.startT || "")) < (b.day + (b.startT || "")) ? -1 : 1; });
+  var html = '<option value="">— aucun événement —</option>';
+  evs.forEach(function (e) {
+    html += '<option value="' + esc(e.id) + '">' + esc(e.title) + " · " + fmtDate(e.day) + (e.startT ? " " + e.startT : "") + "</option>";
+  });
+  sel.innerHTML = html;
+  sel.value = (current && evs.some(function (e) { return e.id === current; })) ? current : "";
+}
+function openListModal(id, parentId) {
+  editListId = id || null;
+  newListParent = (!editListId && parentId && getList(parentId)) ? parentId : null;
+  var l = editListId ? getList(editListId) : null;
+  var p = newListParent ? getList(newListParent) : null;
+  document.getElementById("lLabel").textContent = l ? "Modifier la liste" : (p ? "Nouvelle sous-liste de « " + p.name + " »" : "Nouvelle liste");
+  document.getElementById("lName").value = l ? l.name : "";
+  fillListEvSelect(l ? (l.evId || null) : null); // v14 : le lien liste ↔ événement se règle ici
+  document.getElementById("listModal").className = "modal";
+}
+function closeListModal() {
+  document.getElementById("listModal").className = "modal hidden";
+  editListId = null;
+  newListParent = null;
+}
+function saveListModal() {
+  var name = (document.getElementById("lName").value || "").trim();
+  if (!name) { showToast("⚠️ Donne un nom à la liste"); return; }
+  var evSel = document.getElementById("lEv");
+  var evId = (evSel && evSel.value) ? evSel.value : null; // v14 : lien liste ↔ événement
+  if (editListId) {
+    renameList(editListId, name);
+    var le14 = getList(editListId);
+    if (le14 && (le14.evId || null) !== evId) { le14.evId = evId; save(); } // v14 : le lien change → sauvegardé et fusionné
+  }
+  else addList(name, newListParent, evId);
+  newListParent = null;
+  closeListModal();
+  renderAll();
+}
+
+// ---------- Toast (avec bouton « Annuler » quand une action est proposée) ----------
+var toastTimer = null;
+function showToast(msg, opts) {
+  opts = opts || {};
+  var el = document.getElementById("toast");
+  if (opts.action) {
+    el.innerHTML = esc(msg) + ' <button onclick="undoLast()">' + esc(opts.action) + "</button>";
+    el.className = "show act"; // pointer-events actifs : le bouton doit être cliquable
+  } else {
+    el.textContent = msg;
+    el.className = "show";
+  }
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.className = ""; }, opts.ttl || 2600);
+}
+
+// ---------- Démarrage ----------
+document.getElementById("vBadge").textContent = APP_VERSION;
+applyTheme(); // ☀️/🌙 mémorisé dans la config
+renderCats();
+showView("tasks");
+// Au lancement : 1) fusion avec la sauvegarde Drive (récupère ce qui manque sur cet appareil)
+// 2) reprise des tâches « à synchroniser » 3) rafraîchissement agenda silencieux si périmé
+driveMergeOnStart().then(function () {
+  retryPendingSync();
+  maybeAutoRefresh();
+});
+// v13 : fermer les 6 feuilles d'un coup (Échap, fond de feuille)
+function closeAllSheets() {
+  try { closeModal(); } catch (e2) {}
+  try { closeListModal(); } catch (e2) {}
+  try { closeEvModal(); } catch (e2) {}
+  try { closeQuickAdd(); } catch (e2) {}
+  try { closeDeferSheet(); } catch (e2) {}
+  try { closeItemModal(); } catch (e2) {}
+}
+// Retour au premier plan de l'app (PWA) : on resynchronise
+if (typeof document !== "undefined" && document.addEventListener) {
+  // Échap = fermer la feuille ouverte (n'importe laquelle)
+  document.addEventListener("keydown", function (e) {
+    if (e && e.key === "Escape") closeAllSheets(); // v13 : une seule fonction pour les 6 feuilles
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (typeof document.hidden !== "undefined" && document.hidden) {
+      if (_dirty && state.autoBackup !== false) driveBackupNow(true); // v12 : seulement si des changements partis — et sans violer la pause auto
+      return;
+    }
+    renderAll(); // changement de jour pendant que l'app était en arrière-plan → réaffichage juste
+    driveMergeOnStart(); // fusion Drive aussi au premier plan, pas seulement au lancement
+    maybeAutoRefresh();
+    retryPendingSync();
+  });
+  // v13 : fermeture par le fond — sur téléphone, le doigt peut glisser entre pointerdown et click :
+  // on ne ferme QUE si pointerdown ET click visent le MÊME fond de feuille (jamais un bouton dessous)
+  var _bd = null;
+  document.addEventListener("pointerdown", function (e) {
+    _bd = (e.target && e.target.classList && e.target.classList.contains("modal")) ? e.target : null;
+  });
+  document.addEventListener("click", function (e) {
+    if (_bd && e.target === _bd) closeAllSheets();
+    _bd = null;
+  });
+}
+if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().then(function (ok) {
+    persistOk = ok; // affiché dans la carte ☁️ (options avancées)
+    try { renderBackupCard(); } catch (e) {}
+  }).catch(function () {});
+}
+if ('serviceWorker' in navigator) {
+  var _hadSW = !!(navigator.serviceWorker.controller);
+  addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (_hadSW) showToast("🔄 Nouvelle version installée — recharge la page pour l'obtenir");
+    _hadSW = true;
+  });
+}
+</script>
+</body>
+</html>
