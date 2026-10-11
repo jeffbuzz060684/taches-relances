@@ -437,6 +437,18 @@
     </div>
     <div class="flabel">🏷️ Type — l'événement agenda sera 🔴 rouge (pro) ou 🔵 bleu (perso)</div>
     <div class="cat-row type-row" id="mTypes" style="grid-template-columns:1fr 1fr"></div>
+    <div class="flabel">🔔 Relance — notification via l'app Google Calendar (vide = ne rien changer ; sur une journée entière, Google compte avant minuit du jour J)</div>
+    <select id="mRem">
+      <option value="">— Ne rien changer —</option>
+      <option value="default">Par défaut de l'agenda</option>
+      <option value="none">Aucune notification</option>
+      <option value="10">10 min avant</option>
+      <option value="30">30 min avant</option>
+      <option value="60">1 h avant</option>
+      <option value="120">2 h avant</option>
+      <option value="1440">24 h avant (la veille)</option>
+      <option value="2880">2 jours avant</option>
+    </select>
     <div class="row">
       <button class="cancel" onclick="closeModal()">Annuler</button>
       <button class="ok" onclick="saveModal()">💾 Enregistrer (+ 📅)</button>
@@ -472,6 +484,18 @@
     </div>
     <div class="flabel">🏷️ Type — 🔴 pro ou 🔵 perso, la couleur suit dans Google Agenda</div>
     <div class="cat-row type-row" id="eTypes" style="grid-template-columns:1fr 1fr"></div>
+    <div class="flabel">🔔 Relance — remplace les notifications de cet événement (vide = inchangées)</div>
+    <select id="eRem">
+      <option value="">— Ne rien changer —</option>
+      <option value="default">Par défaut de l'agenda</option>
+      <option value="none">Aucune notification</option>
+      <option value="10">10 min avant</option>
+      <option value="30">30 min avant</option>
+      <option value="60">1 h avant</option>
+      <option value="120">2 h avant</option>
+      <option value="1440">24 h avant (la veille)</option>
+      <option value="2880">2 jours avant</option>
+    </select>
     <input type="text" id="eLoc" placeholder="Lieu (optionnel — copié dans la note de la tâche liée)">
     <div class="row">
       <button class="cancel" onclick="closeEvModal()">Annuler</button>
@@ -533,8 +557,8 @@
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v16.4 (demande Jade : « les modifications d'événement entre pro et perso ne se font pas ») : le type 🔴 pro / 🔵 perso se synchronise dans TOUS les sens — le pull suit la couleur Google (colorId 11 = pro), la modale événement gagne une rangée 🔴/🔵 (PATCH colorId + préfixe du titre), et un changement de type d'une tâche importée part vers Google en PATCH couleur SEULE (jamais de PUT sur un événement qui n'est pas à nous : titre/lieu/invités Google préservés) =====
-var APP_VERSION = "v16.4";
+// ===== Tâches & Relances — v17 (demande Jade : « 1, 2, 3 sans oublier toutes les synchros et modifications dans les 2 sens ») : relances Google Calendar pilotées depuis l'app (poussées ET tirées, PATCH couleur+relances SEULES pour les importées), PATCH au lieu de PUT (lieu/invités/description/relances réglés dans Google ne sont plus écrasés au push des liées), DELETE 404/410 = succès, timeout 20 s sur TOUS les fetch agenda, synchro auto 2 min + toast ⚡ quand elle change quelque chose, la note suit la description Google dans les 2 sens =====
+var APP_VERSION = "v17";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -912,6 +936,7 @@ function addTask(title, note, cat, due, type, extra) {
     endT: validHM(extra.endT),
     until: cleanUntil(due, extra.until),
     rep: cleanRep(extra.rep, due),
+    rem: cleanRem17(extra.rem), // v17 : relance agenda
     gEventId: (typeof extra.gEventId === "string" && extra.gEventId) ? extra.gEventId : null,
     autoImport: extra.autoImport === true,
     repChild: extra.repChild === true, // v12 : occurrence suivante d'une répétition (jamais liée à l'événement maître)
@@ -940,6 +965,7 @@ function editTask(id, title, note, cat, due, type, extra) {
   t.endT = validHM(extra.endT);
   t.until = cleanUntil(t.due, extra.until);
   t.rep = cleanRep(extra.rep, t.due); // v13 : le jour d'origine mensuel suit l'édition
+  t.rem = cleanRem17(extra.rem); // v17 : la relance suit l'édition (push au prochain « Enregistrer (+ 📅) »)
   if (t.autoImport) t.localEdit = true; // tu l'as modifiée : Google ne l'écrasera plus
   save();
   return true;
@@ -965,7 +991,7 @@ function nextOccurrence(t) {
   }
   var nrep = { mode: r.mode, every: r.every, count: (r.count !== null) ? r.count - 1 : null, day: (r.mode === "monthly") ? od : null }; // v13 : le clone garde le jour d'origine
   return addTask(t.title, t.note, catForDate(nd), nd, t.type, {
-    startT: t.startT, endT: t.endT, until: null, rep: nrep, repChild: true,
+    startT: t.startT, endT: t.endT, until: null, rep: nrep, repChild: true, rem: t.rem, // v17 : le clone garde la relance
     gEventId: null, autoImport: false, gSync: null // v12 : le clone ne pointe PAS vers l'événement de l'original (sinon l'éditer décalait la série Google)
   });
 }
@@ -1397,7 +1423,7 @@ function keepLocalSecrets(merged, oldList) { // v15 : réinjecte les codes 🔐 
 }
 function exportData() {
   return {
-    app: "taches-relances", version: 16.4, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version >= 16 = marqueur de rotation Drive (les fichiers v16+ n'ont plus de codes 🔐 dans leur historique)
+    app: "taches-relances", version: 17, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version >= 16 = marqueur de rotation Drive (les fichiers v16+ n'ont plus de codes 🔐 dans leur historique)
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     tombstones: state.tombstones || [],
     savedAt: Date.now()
@@ -1416,6 +1442,7 @@ function normalizeTaskIn(t) {
     endT: validHM(t.endT),
     until: cleanUntil((typeof t.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.due)) ? t.due : null, t.until),
     rep: cleanRep(t.rep, t.due),
+    rem: cleanRem17(t.rem), // v17 : relance agenda — roundtrip export/import/fusion Drive
     gEventId: (typeof t.gEventId === "string" && t.gEventId && /^[\w.:-]{1,128}$/.test(t.gEventId)) ? t.gEventId : null,
     autoImport: t.autoImport === true,
     repChild: t.repChild === true,
@@ -1657,12 +1684,24 @@ function parseEvents(data) {
       allDay: allDay,
       startT: allDay ? "" : st.slice(11, 16),
       endT: allDay ? "" : (en.slice(11, 16) || ""),
-      loc: (typeof it.location === "string") ? it.location : ""
+      loc: (typeof it.location === "string") ? it.location : "",
+      desc: (typeof it.description === "string") ? it.description : "",
+      rem: evRem17(it.reminders) // v17 : relances Google lues au pull ("default", "none", minutes de la 1ʳᵉ popup, "" = inconnu)
     };
   }).filter(function (e) { return /^\d{4}-\d{2}-\d{2}$/.test(e.day); });
 }
+function fetchTO17(url, options, ms) { // v17 : timeout 20 s — un fetch réseau bloqué (réseau mort, iOS figé en arrière-plan) ne gèle plus l'app ni les files de reprise
+  ms = ms || 20000;
+  if (typeof AbortController === "undefined") return fetch(url, options);
+  var ctl = new AbortController();
+  var to = setTimeout(function () { try { ctl.abort(); } catch (e17a) {} }, ms);
+  return fetch(url, Object.assign({}, options, { signal: ctl.signal })).then(
+    function (r17) { clearTimeout(to); return r17; },
+    function (e17) { clearTimeout(to); throw e17; }
+  );
+}
 function agendaFetch(url, options) {
-  return fetch(url, options).then(function (r) {
+  return fetchTO17(url, options).then(function (r) {
     return r.json().catch(function () { return null; }).then(function (j) {
       // une erreur Google (403, 500, quota…) ne doit JAMAIS être lue comme « 0 événement »
       if (!r.ok || (j && j.error)) {
@@ -1737,6 +1776,13 @@ function agendaRefresh(silent) {
     renderAll();
     retryPendingSync();
     return verifyKills(sync.killQueue).then(function (nK) { // v16 : PREUVE de suppression chez Google avant tout retrait
+      if (silent && (nImp > 0 || (sync && sync.nUpd > 0) || nK > 0)) { // v17 : la synchro AUTO ne reste silencieuse que si elle n'a rien changé
+        var bits17 = [];
+        if (nImp > 0) bits17.push(nImp + " tâche(s) importée(s)");
+        if (sync && sync.nUpd > 0) bits17.push(sync.nUpd + " mise(s) à jour");
+        if (nK > 0) bits17.push(nK + " tâche(s) retirée(s)");
+        showToast("⚡ Agenda synchronisé automatiquement — " + bits17.join(" · "));
+      }
       if (!silent) {
         var msg = "📅 Agenda à jour — " + state.agendaCache.events.length + " événement(s) sur " + agendaWindowDays() + " jours";
         if (nImp > 0) msg += " · " + nImp + " tâche(s) importée(s)";
@@ -1794,14 +1840,14 @@ function importAllNow() {
     ? "⚠️ Rien de nouveau : " + ghosts + " événement(s) converti(s) puis supprimé(s) — ré-ajoutables un par un via ＋"
     : "⚠️ Tout est déjà importé");
 }
-// v16.2 : synchro agenda AUTOMATIQUE — rafraîchissement silencieux dès que le cache dépasse 5 min (max 1 essai/min).
+// v16.2/17 : synchro agenda AUTOMATIQUE — rafraîchissement silencieux dès que le cache dépasse 2 min (max 1 essai/min) ; v17 : un toast ⚡ signale quand elle a changé quelque chose.
 // Le bouton 🔄 Actualiser reste là en secours : lui seul affiche le toast complet « Agenda à jour ».
 var lastAutoFetch = 0, agendaAutoBusy = false; // agendaAutoBusy : une synchro auto encore en vol n'en relance pas une 2e par-dessus
 function maybeAutoRefresh() {
   if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) return;
   if (agendaAutoBusy) return; // réseau lent : la précédente n'a pas fini → pas de chevauchement
   var last = (state.agendaCache && state.agendaCache.fetchedAt) || 0;
-  if (Date.now() - last > 5 * 60000 && Date.now() - lastAutoFetch > 60000) {
+  if (Date.now() - last > 2 * 60000 && Date.now() - lastAutoFetch > 60000) { // v17 : 2 min (était 5) — plus réactif, la garde 1 essai/min tient toujours la barrière
     lastAutoFetch = Date.now();
     agendaAutoBusy = true;
     agendaRefresh(true).then(function () { agendaAutoBusy = false; }, function () { agendaAutoBusy = false; });
@@ -1840,6 +1886,9 @@ function taskEventBody(t) {
   }
   var rule = repToRule(t.rep);
   if (rule) ev.recurrence = [rule];
+  if (t.rem === "default") ev.reminders = { useDefault: true }; // v17 : relance pilotée depuis la tâche — popup par l'app Google Calendar (bornes Google vérifiées : 0 à 40 320 min, 5 max)
+  else if (t.rem === "none") ev.reminders = { useDefault: false, overrides: [] };
+  else if (t.rem && /^\d+$/.test(t.rem)) ev.reminders = { useDefault: false, overrides: [{ method: "popup", minutes: parseInt(t.rem, 10) }] };
   return ev;
 }
 function taskToEvent(id) {
@@ -1858,13 +1907,13 @@ function taskToEvent(id) {
     if (!upd) ev.id = clientEventId(t.id); // id déterministe dérivé de la tâche : un renvoi ne crée jamais de doublon
     var url = "https://www.googleapis.com/calendar/v3/calendars/primary/events" + (upd ? "/" + encodeURIComponent(t.gEventId) : "");
     var headers = { "Authorization": "Bearer " + at, "Content-Type": "application/json" };
-    return fetch(url, { method: upd ? "PUT" : "POST", headers: headers, body: JSON.stringify(ev) })
+    return fetchTO17(url, { method: upd ? "PATCH" : "POST", headers: headers, body: JSON.stringify(ev) }) // v17 : PATCH au lieu de PUT — lieu, invités, description et relances réglés dans Google ne sont plus écrasés
       .then(function (r) {
         // événement supprimé côté Google → on le recrée (même id dérivé : impossible de doubler)
         if (upd && (r.status === 404 || r.status === 410)) {
           wasUpdate = false;
           ev.id = clientEventId(t.id);
-          return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", { method: "POST", headers: headers, body: JSON.stringify(ev) });
+          return fetchTO17("https://www.googleapis.com/calendar/v3/calendars/primary/events", { method: "POST", headers: headers, body: JSON.stringify(ev) });
         }
         return r;
       })
@@ -1874,14 +1923,14 @@ function taskToEvent(id) {
           // avec un « 📅 agenda ✓ » mensonger SANS événement. On tente la résurrection (PUT status confirmed) ;
           // si Google la refuse, un id dérivé suffixé recrée l'événement proprement.
           wasUpdate = true;
-          return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(ev.id), {
+          return fetchTO17("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(ev.id), {
             method: "PUT", headers: headers,
             body: JSON.stringify(Object.assign({}, ev, { status: "confirmed" }))
           }).then(function (r2) {
             if (r2.status === 404 || r2.status === 410) {
               wasUpdate = false;
               ev.id = String(String(clientEventId(t.id)) + "x2").slice(0, 100);
-              return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", { method: "POST", headers: headers, body: JSON.stringify(ev) });
+              return fetchTO17("https://www.googleapis.com/calendar/v3/calendars/primary/events", { method: "POST", headers: headers, body: JSON.stringify(ev) });
             }
             return r2;
           });
@@ -1920,12 +1969,13 @@ function agendaDeleteEvent(evId, title, silent) {
     return Promise.resolve(false);
   }
   return agendaAccessToken(cfg).then(function (at) {
-    return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(evId), {
+    return fetchTO17("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(evId), {
       method: "DELETE",
       headers: { "Authorization": "Bearer " + at }
     });
   }).then(function (r) {
-    if (r.status !== 200 && r.status !== 204) throw new Error("delete refusé");
+    if (r.status === 404 || r.status === 410) { /* v17 : déjà parti chez Google (supprimé d'ailleurs) = exactement le résultat attendu */ }
+    else if (r.status !== 200 && r.status !== 204) throw new Error("delete refusé");
     state.pendingEventDeletes = (state.pendingEventDeletes || []).filter(function (e) { return e !== evId; });
     var gone163 = false; // v16.3 : le cache local suit le DELETE — la rangée disparaît de l'app (Agenda, Aujourd'hui) sans attendre le rafraîchissement
     if (state.agendaCache && state.agendaCache.events && state.agendaCache.events.some(function (e) { return e.id === evId; })) {
@@ -2210,6 +2260,32 @@ function agendaDisconnect() {
   showToast("🔌 Agenda déconnecté");
 }
 // note reconstruite depuis un événement (heures + lieu) — sert à l'import et à la mise à jour
+var REMS17 = ["", "default", "none", "10", "30", "60", "120", "1440", "2880"]; // v17 : préréglages de relance affichés dans les 2 modales
+function cleanRem17(v) { // v17 : relance agenda — "" (ne rien changer), "default", "none" ou des minutes AVANT l'événement (0 à 40 320 : borne Google vérifiée)
+  if (typeof v === "number") v = String(v);
+  if (v === "default" || v === "none") return v;
+  if (typeof v === "string" && /^\d+$/.test(v)) { var n = parseInt(v, 10); if (n >= 0 && n <= 40320) return String(n); }
+  return "";
+}
+function remLabel17(v) {
+  if (v === "default") return "défaut agenda";
+  var n = parseInt(v, 10);
+  if (isNaN(n) || n < 0) return "";
+  if (n === 0) return "au début";
+  if (n < 60) return n + " min avant";
+  if (n < 1440) return Math.round(n / 60) + " h avant";
+  if (n < 2880) return "24 h avant";
+  return Math.round(n / 1440) + " j avant";
+}
+function evRem17(reminders) { // v17 : relances de l'événement Google → "default" / "none" / minutes (1ʳᵉ popup) / "" (inconnu : ne rien changer)
+  if (!reminders) return "";
+  if (reminders.useDefault) return "default";
+  var ovs = Array.isArray(reminders.overrides) ? reminders.overrides.filter(function (o) { return o && o.method === "popup" && typeof o.minutes === "number" && o.minutes >= 0 && o.minutes <= 40320; }) : [];
+  return ovs.length ? String(ovs[0].minutes) : "none";
+}
+function stripEvSignature17(desc) { // v17 : retire la signature que l'app pose dans la description Google (« (professionnel|personnel — via Tâches & Relances) »)
+  return String(desc || "").replace(/\n\((?:professionnel|personnel) — via Tâches & Relances\)\s*$/, "").replace(/^\((?:professionnel|personnel) — via Tâches & Relances\)\s*$/, "");
+}
 function buildEvNote(ev) {
   var note = "";
   if (!ev.allDay && (ev.startT || ev.endT)) note = "🕒 " + ev.startT + (ev.endT ? "–" + ev.endT : "");
@@ -2263,7 +2339,8 @@ function importEventAsTask(ev, silent, force) {
     endT: ev.allDay ? null : validHM(ev.endT),
     until: ev.until,
     gEventId: ev.id,
-    autoImport: true
+    autoImport: true,
+    rem: cleanRem17(ev.rem || "") // v17 : la relance de l'événement suit la tâche importée
   });
   state.importedEvents[ev.id] = { taskId: t.id, title: t.title, day: ev.day, at: Date.now() };
   save();
@@ -2297,7 +2374,7 @@ function verifyKills(cands) {
   if (!cfg || !cfg.cid || !cfg.refresh) return Promise.resolve(0);
   return agendaAccessToken(cfg).then(function (at) {
     return Promise.all(list.map(function (c) {
-      return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(c.evId), { headers: { "Authorization": "Bearer " + at } })
+      return fetchTO17("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(c.evId), { headers: { "Authorization": "Bearer " + at } })
         .then(function (r) { return r.json().then(function (j) { return { st: r.status, ev: j }; }).catch(function () { return { st: r.status, ev: null }; }); })
         .catch(function () { return { st: 0, ev: null }; }); // st 0 = injoignable → on ne touche à rien
     })).then(function (rs) {
@@ -2382,8 +2459,12 @@ function syncImportedFromCache(opts) { // v15 : opts.allowKill — les retraits 
         if (ns !== t.startT) { t.startT = ns; changed = true; }
         if (ne !== t.endT) { t.endT = ne; changed = true; }
       } else if (t.startT || t.endT) { t.startT = null; t.endT = null; changed = true; }
-      var newNote = buildEvNote(ev);
+      var newNote = buildEvNote(ev); // v17 : la description Google (signature de l'app retirée) s'ajoute sous l'horaire/lieu — la note est synchro dans les 2 sens
+      var d17i = stripEvSignature17(ev.desc);
+      if (d17i && d17i !== newNote) newNote = (newNote ? newNote + "\n" : "") + d17i;
       if (newNote !== (t.note || "")) { t.note = newNote; changed = true; }
+      var r17i = cleanRem17(ev.rem || "");
+      if (r17i !== cleanRem17(t.rem || "")) { t.rem = r17i || null; changed = true; } // v17 : la relance suit la tâche importée (2 sens)
       if (rec.day !== ev.day) { rec.day = ev.day; changed = true; } // v16 : la trace suit la date RÉELLE — un déplacement ne laisse plus rec.day pointer l'ancienne date
       if (changed) nUpd++;
     } else if (allowKill && (rec.day || t.due) && (rec.day || t.due) >= today() && (rec.day || t.due) < horizon && t.cat !== "done" && killAllowed(t)) { // v16.1 : localEdit candidate aussi — pour le badge « disparu » uniquement (badgeOnly), jamais pour le retrait
@@ -2420,6 +2501,10 @@ function syncImportedFromCache(opts) { // v15 : opts.allowKill — les retraits 
       if (ls14 !== t.startT) { t.startT = ls14; changed = true; }
       if (le14 !== t.endT) { t.endT = le14; changed = true; }
     } else if (t.startT || t.endT) { t.startT = null; t.endT = null; changed = true; }
+    var nN17 = stripEvSignature17(ev.desc); // v17 : la note de la liée suit la description Google (l'app remet sa signature au prochain push)
+    if (nN17 !== (t.note || "")) { t.note = nN17; changed = true; }
+    var rL17 = cleanRem17(ev.rem || "");
+    if (rL17 !== cleanRem17(t.rem || "")) { t.rem = rL17 || null; changed = true; } // v17 : la relance suit la tâche liée (2 sens)
     if (changed) nUpd++;
   });
   if (nUpd > 0 || nGone > 0) persist();
@@ -2461,6 +2546,8 @@ function openEvModal(evId) {
   document.getElementById("eEnd").value = ev.allDay ? "" : (ev.endT || "");
   document.getElementById("eLoc").value = ev.loc || "";
   renderEvTypes164(ev.color === "11" ? "pro" : "perso"); // v16.4 : le type de la modale suit la couleur Google — modifiable (PATCH colorId)
+  var er17 = document.getElementById("eRem"); // v17 : relance de l'événement, pré-remplie — le PATCH ne l'envoie QUE si tu choisis
+  if (er17) er17.value = cleanRem17(ev.rem || "") || "";
   document.getElementById("evModal").className = "modal";
 }
 function closeEvModal() {
@@ -2489,11 +2576,15 @@ function agendaSaveEvent() {
     var r = document.getElementById("eType-" + c);
     if (r && r.checked) newType164 = c;
   });
+  var remE17 = ((document.getElementById("eRem") || {}).value || ""); // v17 : relance — vide = les notifications Google restent telles quelles
   var body = {
     summary: (newType164 === "pro" ? "🔴 " : "🔵 ") + stripEvTitle(title),
     location: loc || "",
     colorId: (newType164 === "pro") ? "11" : "9"
   };
+  if (remE17 === "default") body.reminders = { useDefault: true };
+  else if (remE17 === "none") body.reminders = { useDefault: false, overrides: [] };
+  else if (/^\d+$/.test(remE17)) body.reminders = { useDefault: false, overrides: [{ method: "popup", minutes: parseInt(remE17, 10) }] };
   if (startT) {
     body.start = { dateTime: day + "T" + startT + ":00", timeZone: tz };
     var endDay = multi ? until : day;
@@ -2507,7 +2598,7 @@ function agendaSaveEvent() {
   }
   var idBefore = ev.id;
   return agendaAccessToken(cfg).then(function (at) {
-    return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(idBefore), {
+    return fetchTO17("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(idBefore), {
       method: "PATCH",
       headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" },
       body: JSON.stringify(body)
@@ -2527,6 +2618,7 @@ function agendaSaveEvent() {
     ev.startT = startT || "";
     ev.endT = endT || "";
     ev.loc = loc;
+    ev.rem = cleanRem17(remE17); // v17 : le cache local suit la relance choisie
     state.agendaCache.events.sort(function (a, b) {
       if (a.day !== b.day) return (a.day < b.day) ? -1 : 1;
       return ((a.startT || "99:99") <= (b.startT || "99:99")) ? -1 : 1;
@@ -2560,6 +2652,7 @@ function taskHtml(t) {
   if (t.evGone) meta.push('<span class="gone">⚠️ plus dans l\'agenda</span>');
   if (t.gSync === "pending") meta.push('<span class="pend">🔄 à synchroniser</span>');
   else if (t.gSync === "ok") meta.push("📅 agenda ✓");
+  if (t.rem && t.rem !== "none") meta.push("🔔 " + remLabel17(t.rem)); // v17 : relance agenda visible sur la carte
   var dh = dueHtml(t);
   if (dh) meta.push(dh);
   meta.push("créée le " + fmtDate(t.createdAt));
@@ -3253,6 +3346,8 @@ function openModal(id) {
   document.getElementById("mRepCount").value = (t && t.rep && t.rep.count) ? t.rep.count : "";
   onRepChange();
   pickType(t ? (t.type === "pro" ? "pro" : "perso") : "perso");
+  var mr17 = document.getElementById("mRem"); // v17 : relance de la tâche, pré-remplie (valeur absente du select = vide ; le pull la restaure)
+  if (mr17) mr17.value = cleanRem17(t ? (t.rem || "") : "") || "";
   document.getElementById("modal").className = "modal";
 }
 function onRepChange() {
@@ -3289,10 +3384,13 @@ function syncTaskColor164(id) {
   var cfg = state.cfg;
   if (!cfg || !cfg.cid || !cfg.refresh) return Promise.resolve(false);
   var body = { colorId: (t.type === "pro") ? "11" : "9" };
+  if (t.rem === "default") body.reminders = { useDefault: true }; // v17 : la relance d'une importée part dans le MÊME PATCH (ni description ni invités : l'événement n'est pas à nous)
+  else if (t.rem === "none") body.reminders = { useDefault: false, overrides: [] };
+  else if (t.rem && /^\d+$/.test(t.rem)) body.reminders = { useDefault: false, overrides: [{ method: "popup", minutes: parseInt(t.rem, 10) }] };
   var ev = findEvent(t.gEventId);
   if (ev) body.summary = (t.type === "pro" ? "🔴 " : "🔵 ") + stripEvTitle(ev.title); // le préfixe suit la nouvelle couleur, le titre Google reste le sien
   return agendaAccessToken(cfg).then(function (at) {
-    return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(t.gEventId), {
+    return fetchTO17("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(t.gEventId), {
       method: "PATCH",
       headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" },
       body: JSON.stringify(body)
@@ -3303,9 +3401,9 @@ function syncTaskColor164(id) {
       return j;
     });
   }).then(function () {
-    if (ev) { ev.color = (t.type === "pro") ? "11" : "9"; ev.title = body.summary; } // le cache local suit tout de suite
+    if (ev) { ev.color = (t.type === "pro") ? "11" : "9"; ev.title = body.summary; ev.rem = cleanRem17(t.rem || ""); } // le cache local suit tout de suite
     persist();
-    showToast("🏷️ Type envoyé à l'agenda — l'événement est " + (t.type === "pro" ? "🔴 pro" : "🔵 perso"));
+    showToast("🏷️ Type envoyé à l'agenda — l'événement est " + (t.type === "pro" ? "🔴 pro" : "🔵 perso") + (body.reminders ? " · 🔔 relance : " + ((t.rem === "none") ? "aucune" : (t.rem === "default") ? "défaut agenda" : (remLabel17(t.rem) || "personnalisée")) : ""));
     return true;
   }).catch(function () {
     showToast("⚠️ Couleur non envoyée à l'agenda (réseau ?) — ta tâche garde son type, l'événement Google garde sa couleur");
@@ -3326,13 +3424,14 @@ function saveModal(autoSync) {
   if (rep && rep.mode === "ndays" && !rep.every) { showToast("⚠️ Indique « tous les combien de jours » (2, 3…)"); return null; }
   var t0 = editId ? getTask(editId) : null;
   var oldType164 = t0 ? t0.type : null; // v16.4 : pour détecter un changement de type sur une tâche importée
+  var oldRem17 = t0 ? cleanRem17(t0.rem || "") : ""; // v17 : idem pour la relance
   var cat = due ? catForDate(due) : (t0 ? t0.cat : "later"); // v11 : la DATE classe la tâche (catégorie interne déduite, plus de boutons)
   var type = "perso";
   TYPES.forEach(function (c) {
     var r = document.getElementById("mType-" + c);
     if (r && r.checked) type = c;
   });
-  var extra = { startT: startT, endT: endT, until: until, rep: rep };
+  var extra = { startT: startT, endT: endT, until: until, rep: rep, rem: ((document.getElementById("mRem") || {}).value || "") }; // v17 : la relance part avec le reste
   var t;
   if (editId) {
     editTask(editId, title, note, cat, due, type, extra);
@@ -3352,7 +3451,7 @@ function saveModal(autoSync) {
     else if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) showToast("✅ Tâche enregistrée (agenda non connecté)");
     else { showToast("💾 Enregistré — 📅 synchro agenda en cours…"); taskToEvent(t.id); }
   }
-  if (autoSync !== false && t && t.autoImport && t.gEventId && oldType164 && oldType164 !== t.type) syncTaskColor164(t.id); // v16.4 : importée passée pro↔perso → la couleur part vers Google en PATCH seul
+  if (autoSync !== false && t && t.autoImport && t.gEventId && ((oldType164 && oldType164 !== t.type) || (oldRem17 !== cleanRem17(t.rem || "")))) syncTaskColor164(t.id); // v16.4/17 : importée dont le type OU la relance a changé → PATCH couleur et/ou relances SEULES (jamais de PUT sur un événement qui n'est pas à nous)
   return t;
 }
 
@@ -3452,7 +3551,7 @@ if (typeof document !== "undefined" && document.addEventListener) {
     maybeAutoRefresh();
     retryPendingSync();
   });
-  // v16.2 : heartbeat — tant que l'app est OUVERTE au premier plan, l'agenda se resynchro tout seul (cache > 5 min).
+  // v16.2/17 : heartbeat — tant que l'app est OUVERTE au premier plan, l'agenda se resynchro tout seul (cache > 2 min).
   // En arrière-plan le navigateur gèle le minuteur : au retour, c'est visibilitychange → maybeAutoRefresh qui resynchro.
   var agendaTimer = setInterval(function () {
     if (typeof document !== "undefined" && document.hidden) return; // caché : pas de réseau inutile, le retour au 1er plan s'en charge

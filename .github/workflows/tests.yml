@@ -1,0 +1,18 @@
+# Tests automatiques — le harnais Node tourne à CHAQUE push sur main.
+# Le harnais extrait le <script> de la page, l'exécute avec des stubs (localStorage, document, fetch pilotable)
+# et vérifie la logique de synchronisation Google Agenda / Drive : 136 assertions en v17.
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Harnais de tests (synchro agenda, relances, fusion Drive)
+        run: node v17-test-harness.js index.html sw.js
