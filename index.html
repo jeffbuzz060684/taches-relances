@@ -531,8 +531,8 @@
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v14 : synchro bidirectionnelle TOTALE agenda ↔ tâches liées (modifs de Google suivies, événement supprimé = tâche retirée, ✓ garde l'événement), listes liées aux événements =====
-var APP_VERSION = "v14";
+// ===== Tâches & Relances — v15 : correctifs audit v14 — retraits seulement sur cache frais et horizon strict (timeMax Google EXCLUSIF : plus de tâche tuée au jour J-N), confirmation au-delà de 3 retraits, « sans toucher à l'agenda » = modifs protégées (localEdit), codes 🔐 conservés uniquement sur cet appareil (jamais Drive ni exports) =====
+var APP_VERSION = "v15";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -1264,7 +1264,7 @@ function toggleReveal(itemId) {
 function toggleSecretNext() {
   secretNext = !secretNext;
   renderAll();
-  showToast(secretNext ? "🔐 Mode code masqué : le prochain élément sera masqué ••••••" : "Mode code masqué désactivé");
+showToast(secretNext ? "🔐 Mode code masqué : le prochain élément sera masqué •••••• — conservé uniquement sur cet appareil" : "Mode code masqué désactivé");
 }
 function copyItemSecret(listId, itemId) {
   var l = getList(listId);
@@ -1352,9 +1352,28 @@ function openList(id) {
 }
 
 // ---------- Export / Import ----------
+// v15 : les éléments 🔐 (codes masqués) ne quittent PLUS cet appareil — ni Drive, ni exports, ni fusions.
+// À la fusion/restauration, les codes LOCAUX sont réinjectés dans leur liste (le fichier distant n'en contient plus jamais).
+function redactListsForExport(lists) {
+  return (lists || []).map(function (l) {
+    var out = {};
+    Object.keys(l).forEach(function (k) { out[k] = l[k]; });
+    out.items = (l.items || []).filter(function (it) { return !it.secret; });
+    return out;
+  });
+}
+function keepLocalSecrets(merged, oldList) { // v15 : réinjecte les codes 🔐 locaux manquants dans une liste remplacée par sa version distante
+  if (!oldList || !Array.isArray(oldList.items)) return merged;
+  var seen = {};
+  (merged.items || []).forEach(function (it) { seen[it.id] = 1; });
+  oldList.items.forEach(function (it) {
+    if (it && it.secret && !seen[it.id]) merged.items.push({ id: it.id, text: it.text, done: it.done, qty: null, secret: true });
+  });
+  return merged;
+}
 function exportData() {
   return {
-    app: "taches-relances", version: 14, tasks: state.tasks, lists: state.lists,
+    app: "taches-relances", version: 15, tasks: state.tasks, lists: redactListsForExport(state.lists), // v15 : les éléments 🔐 ne quittent plus cet appareil
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     tombstones: state.tombstones || [],
     savedAt: Date.now()
@@ -1436,8 +1455,13 @@ function importJsonText(txt, opts) {
   (Array.isArray(p.lists) ? p.lists : []).forEach(function (l) { if (l && l.id) keepIn[l.id] = 1; });
   state.tasks.forEach(function (t) { if (!keepIn[t.id]) addTombstone(t.id, "task"); });
   state.lists.forEach(function (l) { if (!keepIn[l.id]) addTombstone(l.id, "list"); });
+  var oldLists15 = state.lists.slice(); // v15 : les codes 🔐 locaux doivent survivre à la restauration (le fichier restauré n'en contient plus)
   state.tasks = p.tasks.filter(function (t) { return t && typeof t.title === "string"; }).map(normalizeTaskIn);
   state.lists = (Array.isArray(p.lists) ? p.lists : []).filter(function (l) { return l && typeof l.name === "string"; }).map(normalizeListIn);
+  state.lists.forEach(function (nl) { // v15 : réinjection des codes 🔐 locaux dans les listes restaurées
+    var ol15 = oldLists15.filter(function (x) { return x.id === nl.id; })[0];
+    if (ol15) keepLocalSecrets(nl, ol15);
+  });
   state.autoAgenda = p.autoAgenda === true;
   state.importedEvents = (p.importedEvents && typeof p.importedEvents === "object") ? p.importedEvents : {};
   if (Array.isArray(p.tombstones)) {
@@ -1486,7 +1510,7 @@ function mergeRemote(data) {
     if (deadL[dl.id] && (dl.updatedAt || 0) <= deadL[dl.id]) return;
     var cur = byIdL[dl.id];
     if (!cur) { state.lists.push(normalizeListIn(dl)); added++; }
-    else if ((dl.updatedAt || 0) > (cur.updatedAt || 0)) { state.lists[state.lists.indexOf(cur)] = normalizeListIn(dl); changed++; }
+    else if ((dl.updatedAt || 0) > (cur.updatedAt || 0)) { state.lists[state.lists.indexOf(cur)] = keepLocalSecrets(normalizeListIn(dl), cur); changed++; } // v15 : le distant ne contient plus les 🔐 → codes locaux réinjectés
   });
   // 3. union des pierres tombales (la plus récente gagne) + purge au-delà de 60 jours
   var tb = {};
@@ -1553,7 +1577,7 @@ function doExport() {
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
-    showToast("💾 Export téléchargé");
+    showToast("💾 Export téléchargé" + (state.lists.some(function (l) { return (l.items || []).some(function (it) { return it.secret; }); }) ? " — les codes 🔐 ne sont PAS dans le fichier" : ""));
   } catch (e) { showToast("⚠️ Export impossible"); }
 }
 function handleImport(ev) {
@@ -1681,7 +1705,7 @@ function agendaRefresh(silent) {
     clearSyncError("agenda"); // synchro agenda réussie : la pastille redevient verte si elle était orange
     var nImp = 0, sync = null;
     if (state.autoAgenda) nImp = autoImportAll().n; // v13 : les occurrences de séries ne sont plus importées en masse
-    sync = syncImportedFromCache(); // v14 : TOUJOURS — les tâches liées se synchronisent même si l'import auto est coupé
+    sync = syncImportedFromCache({ allowKill: true }); // v15 : TOUJOURS synchronisées, mais les retraits n'ont lieu QUE sur ce cache fraîchement téléchargé
     persist();
     renderAll();
     retryPendingSync();
@@ -2193,13 +2217,16 @@ function killLinkedTask(id) {
   showToast("🗑️ Supprimé dans l'agenda — la tâche « " + t.title + " » a suivi", { action: "Annuler", ttl: 5000 });
   return true;
 }
-function syncImportedFromCache() {
+function syncImportedFromCache(opts) { // v15 : opts.allowKill — les retraits ne se font QUE sur un cache fraîchement téléchargé (agendaRefresh)
+  opts = opts || {};
   var evs = (state.agendaCache && state.agendaCache.events) || [];
   var byId = {};
   evs.forEach(function (e) { byId[e.id] = e; });
   var horizon = addDaysISO(today(), agendaWindowDays());
   var nUpd = 0, nGone = 0, nKill = 0; // v14 : nKill = tâches retirées parce que leur événement a été supprimé dans Google
   var fetchedAt = (state.agendaCache && typeof state.agendaCache.fetchedAt === "number") ? state.agendaCache.fetchedAt : 0; // v14 : date du cache — un push plus récent ne doit pas être écrasé par lui
+  var allowKill = opts.allowKill === true && fetchedAt > 0 && (Date.now() - fetchedAt) < 15 * 60000; // v15 : un cache de plus de 15 min ne tue JAMAIS (onglet en sommeil, changement de compte Google)
+  var killQueue = []; // v15 : aucune suppression directe dans les boucles — décision groupée après comptage
   Object.keys(state.importedEvents || {}).forEach(function (evId) {
     var rec = state.importedEvents[evId];
     var t = getTask(rec.taskId);
@@ -2221,11 +2248,11 @@ function syncImportedFromCache() {
       var newNote = buildEvNote(ev);
       if (newNote !== (t.note || "")) { t.note = newNote; changed = true; }
       if (changed) nUpd++;
-    } else if ((rec.day || t.due) && (rec.day || t.due) >= today() && (rec.day || t.due) <= horizon && t.cat !== "done" && killAllowed(t)) {
+    } else if (allowKill && (rec.day || t.due) && (rec.day || t.due) >= today() && (rec.day || t.due) < horizon && t.cat !== "done" && killAllowed(t)) { // v15 : < horizon — timeMax Google est EXCLUSIF : le jour limite entier est hors cache (off-by-one v14)
       // v14 : l'événement d'ORIGINE (rec.day — PAS t.due, qui peut avoir été reportée localement) devait être dans
       // le cache et n'y est plus → il a été supprimé dans Google → la tâche suit (avant : juste un badge « disparu »).
       // rec.day évite de tuer une tâche reportée dont l'ancien événement, simplement passé de date, a quitté la fenêtre.
-      killLinkedTask(t.id); nKill++;
+      killQueue.push(t); // v15 : la suppression attend la décision groupée
     }
   });
   // v14 : sync bidirectionnelle des tâches LIÉES créées dans l'app (+📅) — les modifs faites dans Google Agenda
@@ -2239,7 +2266,7 @@ function syncImportedFromCache() {
     if (t.pushedAt && fetchedAt && t.pushedAt > fetchedAt) return; // notre écriture est plus récente que le cache : rien à tirer
     var ev = byId[t.gEventId];
     if (!ev) {
-      if (t.due && t.due >= today() && t.due <= horizon && killAllowed(t)) { killLinkedTask(t.id); nKill++; }
+      if (allowKill && t.due && t.due >= today() && t.due < horizon && killAllowed(t)) killQueue.push(t); // v15 : < horizon (timeMax exclusif) + cache frais exigé
       return;
     }
     var changed = false;
@@ -2254,6 +2281,14 @@ function syncImportedFromCache() {
     } else if (t.startT || t.endT) { t.startT = null; t.endT = null; changed = true; }
     if (changed) nUpd++;
   });
+  // v15 : garde-fou — un changement de compte Google fait disparaître TOUTE la fenêtre d'un coup :
+  // au-delà de 3 retraits, rien ne se fait sans confirmation explicite (avant : suppression en masse silencieuse)
+  if (killQueue.length > 3) {
+    var goKill = true;
+    if (typeof confirm === "function") goKill = confirm("⚠️ " + killQueue.length + " tâche(s) liée(s) auraient leur événement absent de l'agenda.\nC'est attendu si tu viens de supprimer beaucoup d'événements ou de changer de compte Google.\n\nRetirer ces " + killQueue.length + " tâche(s) ?");
+    if (!goKill) { killQueue = []; showToast("🛡️ Rien n'a été retiré — vérifie dans Google Agenda puis relance 🔄"); }
+  }
+  killQueue.forEach(function (t) { if (killAllowed(t)) { killLinkedTask(t.id); nKill++; } });
   if (nUpd > 0 || nGone > 0 || nKill > 0) persist();
   return { nUpd: nUpd, nGone: nGone, nKill: nKill };
 }
@@ -2643,6 +2678,8 @@ function renderListDetail() {
     + '<button class="rowbtn" title="Renommer" onclick="openListModal(\'' + l.id + "')\">✏️</button>"
     + (l.evId && findEvent(l.evId) ? '<button class="rowbtn" title="Voir dans l\'agenda" onclick="showView(\'agenda\')">🔗 ' + fmtDate(findEvent(l.evId).day) + "</button>" : "") // v14 : liste liée à un événement — un tap saute à l'agenda
     + "</div>";
+  var nSec15 = l.items.filter(function (it) { return it.secret; }).length; // v15 : rappel visible — les 🔐 restent sur cet appareil
+  if (nSec15 > 0) html += '<div class="meta" style="padding:2px 14px 0">🔒 ' + nSec15 + " code(s) conservé(s) uniquement sur cet appareil — jamais envoyés sur Drive ni dans les exports</div>";
   var shown = (l.hideDone === true) ? l.items.filter(function (x) { return !x.done; }) : l.items;
   var nDone = l.items.length - shown.length;
   if (l.items.length === 0) {
@@ -3100,6 +3137,11 @@ function saveModal(autoSync) {
     t = getTask(editId);
   } else {
     t = addTask(title, note, cat, due, type, extra);
+  }
+  if (autoSync === false && t && t.gEventId && !t.autoImport) {
+    t.localEdit = true; // v15 : « sans toucher à l'agenda » sur une tâche LIÉE — avant, le prochain rafraîchissement écrasait ces modifs en silence
+    save();
+    showToast("🛡️ Enregistré sans l'agenda — Google ne réécrira pas cette tâche au prochain rafraîchissement");
   }
   closeModal();
   renderAll();
