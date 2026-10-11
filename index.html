@@ -513,7 +513,7 @@
 "use strict";
 
 // ===== Tâches & Relances — v10 : UX (écran ⭐ Aujourd'hui, saisie rapide, vrai Reporter ⬅️, Annuler 5 s, pastille synchro 🔴🟠🟢, occurrence suivante des répétitions, listes : collage en lot + édition + masquer cochés + progression totale + Partager, thème clair ☀️, contraste, cibles 44 px, onglets accessibles, badge d'icône, Échap/fond = fermer, toast mise à jour SW) =====
-var APP_VERSION = "v10";
+var APP_VERSION = "v10.1";
 var KEY = "taches-relances-v2";
 var TABS = ["today", "urgent", "week", "later", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -1614,7 +1614,14 @@ function importAllNow() {
   var n = autoImportAll();
   save();
   renderAll();
-  showToast(n > 0 ? "📥 " + n + " événement(s) transformé(s) en tâche(s)" : "⚠️ Tout est déjà importé");
+  if (n > 0) { showToast("📥 " + n + " événement(s) transformé(s) en tâche(s)"); return; }
+  // v10.1 : le refus est expliqué — traces d'imports de tâches supprimées vs événements réellement liés
+  var ghosts = state.agendaCache.events.filter(function (e) {
+    return state.importedEvents[e.id] && !evOwnerTask(e);
+  }).length;
+  showToast(ghosts > 0
+    ? "⚠️ Rien de nouveau : " + ghosts + " événement(s) converti(s) puis supprimé(s) — ré-ajoutables un par un via ＋"
+    : "⚠️ Tout est déjà importé");
 }
 // Actualisation silencieuse si l'agenda n'a pas été rafraîchi depuis plus de 15 min (max 1 essai/min)
 var lastAutoFetch = 0;
@@ -1947,17 +1954,24 @@ function buildEvNote(ev) {
   if (ev.loc) note += (note ? " · " : "") + "📍 " + ev.loc;
   return note;
 }
+// tâche de l'app possédant cet événement (id exact, récurrence d'origine ou instance « base_date »)
+function evOwnerTask(ev) {
+  var base = String(ev.id).split("_")[0];
+  for (var i = 0; i < state.tasks.length; i++) {
+    var t = state.tasks[i];
+    if (t.gEventId && (t.gEventId === ev.id || t.gEventId === base || String(t.gEventId).split("_")[0] === base)) return t;
+  }
+  return null;
+}
 // Importer un événement de l'agenda en tâche — dédoublonné via importedEvents
-function importEventAsTask(ev, silent) {
+// v10.1 : une trace d'import dont la tâche a été supprimée ne bloque plus le bouton ＋ (force)
+// — l'import AUTO reste bloqué (une suppression ne doit pas ressusciter toute seule via Drive)
+function importEventAsTask(ev, silent, force) {
   if (!ev || !ev.day || !/^\d{4}-\d{2}-\d{2}$/.test(ev.day)) return null;
   state.importedEvents = state.importedEvents || {};
-  if (state.importedEvents[ev.id]) return null;
+  if (state.importedEvents[ev.id] && !force) return null;
   // anti-doublon : une tâche de l'app ayant déjà cet événement (ou l'événement récurrent d'origine) → jamais de 2e tâche
-  var base = String(ev.id).split("_")[0];
-  var owned = state.tasks.some(function (t) {
-    if (!t.gEventId) return false;
-    return t.gEventId === ev.id || t.gEventId === base || String(t.gEventId).split("_")[0] === base; // instances : la base suffit
-  });
+  var owned = evOwnerTask(ev);
   if (owned) {
     state.importedEvents[ev.id] = { taskId: null, title: ev.title, day: ev.day, at: Date.now() };
     save();
@@ -2017,10 +2031,15 @@ function syncImportedFromCache() {
 function eventToTask(evId) {
   var ev = findEvent(evId);
   if (!ev) return false;
-  var t = importEventAsTask(ev, false);
+  var t = importEventAsTask(ev, false, true); // ＋ manuel : une ancienne trace d'import (tâche supprimée depuis) ne bloque plus
   renderAll();
   if (t) showToast("✅ Tâche créée : " + t.title);
-  else showToast("⚠️ Cet événement est déjà dans tes tâches");
+  else {
+    var own = evOwnerTask(ev); // le refus vient forcément d'une tâche existante : disons laquelle
+    showToast(own && own.cat === "done"
+      ? "⚠️ Déjà dans tes tâches — rangée dans « Terminé »"
+      : "⚠️ Cet événement est déjà dans tes tâches");
+  }
   return !!t;
 }
 
