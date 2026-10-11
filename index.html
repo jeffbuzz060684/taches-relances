@@ -531,8 +531,8 @@
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v16 : audit v15 — PREUVE de suppression avant tout retrait (GET ciblé : 404/410 = retiré, 200 = déplacé → la tâche suit), localEdit protège du retrait et repart au push, purge des liens vivants, verrou Drive + rotation du fichier (historique de versions sans codes 🔐), plus de doublons dans Aujourd'hui =====
-var APP_VERSION = "v16";
+// ===== Tâches & Relances — v16.1 (revues v16, affaire confirmée chez Google) : suppression PROUVÉE aussi par status "cancelled" (soft-delete Google : un événement supprimé reste lisible, le 404 ne vient qu'après purge), tâche modifiée à la main vérifiée pour le badge « disparu » mais JAMAIS retirée, déplacé hors fenêtre TOTALEMENT suivi (heures, note, trace, save() Drive), toast distinct injoignable/déplacé, verrou Drive expirable 2 min, rotation : files.delete = définitif + retry de création, doublon trace taskId null, Aujourd'hui trié par horaire =====
+var APP_VERSION = "v16.1";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -1373,7 +1373,7 @@ function keepLocalSecrets(merged, oldList) { // v15 : réinjecte les codes 🔐 
 }
 function exportData() {
   return {
-    app: "taches-relances", version: 16, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version 16 = marqueur de rotation Drive (l'historique de l'ancien fichier ne suit pas)
+    app: "taches-relances", version: 16.1, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version >= 16 = marqueur de rotation Drive (les fichiers v16+ n'ont plus de codes 🔐 dans leur historique)
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     tombstones: state.tombstones || [],
     savedAt: Date.now()
@@ -1941,14 +1941,20 @@ function driveFolderName() {
   return (cfg.dFolder && String(cfg.dFolder).trim()) || DRIVE_DEFAULT_FOLDER;
 }
 var driveSending = false; // v16 : verrou local — un seul envoi Drive à la fois sur cet appareil (l'audit v15 : deux déclenchements entrelacés se lisaient/écrivaient dessus)
+var driveSendingAt = 0; // v16.1 : horodatage de la pose — un envoi bloqué (fetch pendante, iOS en arrière-plan) n'expire plus jamais les sauvegardes
 function driveBackupNow(silent) {
   var cfg = state.cfg;
   if (!cfg || !cfg.dCid || !cfg.dRefresh) { if (!silent) showToast("⚠️ Configure d'abord la sauvegarde Drive"); return Promise.resolve(false); }
   var doSend = function () {
     var folderName = driveFolderName();
     var seq0 = _saveSeq; // v13 : un changement survenu PENDANT l'envoi ne doit pas rester non envoyé
-    if (driveSending) { _dirty = true; _saveSeq++; return Promise.resolve(false); } // v16 : un envoi est déjà en cours — celui-ci repartira après (via _saveSeq > seq0, pas un _dirty écrasé en fin d'envoi)
-    driveSending = true; // v16 : verrou posé AVANT le premier fetch
+    if (driveSending && Date.now() - driveSendingAt < 120000) { // v16.1 : verrou AVEC expiration 2 min — un envoi bloqué ne fige plus les sauvegardes à jamais
+      if (!silent) showToast("☁️ Envoi déjà en cours — celui-ci repartira juste après"); // v16.1 : plus de « Sauvegarder maintenant » muet pendant un envoi
+      _dirty = true; _saveSeq++; return Promise.resolve(false); // v16 : celui-ci repartira après (via _saveSeq > seq0, pas un _dirty écrasé en fin d'envoi)
+    }
+    if (driveSending) showToast("⚠️ Un envoi Drive semblait bloqué depuis plus de 2 min — nouvelle tentative"); // v16.1 : verrou périmé → on reprend la main
+    var myLock = Date.now(); // v16.1 : signature du verrou — on ne libérera que le sien
+    driveSending = true; driveSendingAt = myLock; // v16 : verrou posé AVANT le premier fetch + horodatage v16.1
     var at = null, folderId = null, fileId = null;
     return oauthToken(cfg.dCid, cfg.dSecret || "", cfg.dRefresh).then(function (tk) {
       at = tk;
@@ -1974,17 +1980,20 @@ function driveBackupNow(silent) {
       var content = JSON.stringify(exportData(), null, 2);
       // v16 : rotation — si le fichier distant date d'avant la v16, son HISTORIQUE DE VERSIONS (~30 j chez Google)
       // contient peut-être des codes 🔐 en clair (les sauvegardes v14 et plus anciennes les embarquaient).
-      // Un fichier NEUF repart avec un historique vierge ; l'ancien part à la corbeille Drive (à vider manuellement
-      // pour tout effacer). Le 2e appareil voit ensuite version >= 16 → PATCH normal, plus de rotation.
+      // v16.1 : files.delete = suppression DÉFINITIVE — l'API Drive v3 n'a PAS de corbeille ici ; l'historique de
+      // versions contenant les codes part immédiatement, RIEN à vider manuellement. Le 2e appareil voit ensuite version >= 16 → PATCH normal, plus de rotation.
       if (fileId && remote && !((remote.version || 0) >= 16)) {
         return driveDeleteFile(at, fileId)
-          .then(function () { return driveCreateFile(at, folderId, content); })
-          .then(function () { return "recréé — historique de versions vierge, codes 🔐 absents"; });
+          .then(function () {
+            return driveCreateFile(at, folderId, content)
+              .catch(function () { return driveCreateFile(at, folderId, content); }); // v16.1 : 1 retry — après un DELETE définitif, ne pas rester sans fichier distant (le prochain envoi recréerait de toute façon)
+          })
+          .then(function () { return "recréé — historique vierge, codes 🔐 absents (l'ancien fichier est supprimé définitivement)"; });
       }
       if (fileId) return driveUpdateFile(at, fileId, content).then(function () { return "mis à jour"; });
       return driveCreateFile(at, folderId, content).then(function () { return "créé"; });
     }).then(function (res) {
-      driveSending = false; // v16 : verrou libéré
+      if (driveSendingAt === myLock) driveSending = false; // v16.1 : verrou libéré — seulement si c'est toujours NOTRE verrou (un envoi bloqué qui revient ne coupe pas celui qui l'a remplacé)
       state.driveSyncedAt = Date.now();
       _dirty = _saveSeq > seq0; // v13 : des modifs sont survenues pendant l'envoi → on repart tout de suite
       if (_dirty) scheduleDriveBackup();
@@ -1992,7 +2001,7 @@ function driveBackupNow(silent) {
       persist();
       if (!silent) showToast("☁️ Sauvegardé sur Drive — « " + DRIVE_FILE_NAME + " » dans " + folderName + " (" + res + ")");
       return true;
-    }).catch(function (e) { driveSending = false; throw e; }); // v16 : verrou libéré aussi en échec
+    }).catch(function (e) { if (driveSendingAt === myLock) driveSending = false; throw e; }); // v16.1 : verrou libéré aussi en échec (seulement si c'est le nôtre)
   };
   // jamais d'écrasement Drive sans fusion préalable réussie (sinon un appareil à jour vide écraserait tout)
   if (driveMergedOk) return doSend().catch(function (e) {
@@ -2256,25 +2265,44 @@ function verifyKills(cands) {
         .then(function (r) { return r.json().then(function (j) { return { st: r.status, ev: j }; }).catch(function () { return { st: r.status, ev: null }; }); })
         .catch(function () { return { st: 0, ev: null }; }); // st 0 = injoignable → on ne touche à rien
     })).then(function (rs) {
-      var confirmed = [], kept = 0, moved = 0;
+      var confirmed = [], kept = 0, moved = 0, unverifiable = 0;
       rs.forEach(function (r, i) {
         var t = getTask(list[i].t.id);
-        if (!t || t.localEdit || t.cat === "done") return; // état changé ou protégé entre-temps : on ne touche à rien
-        if (r.st === 404 || r.st === 410) { confirmed.push(t); return; }
-        kept++; // 200 = l'événement existe (déplacé) OU injoignable : la tâche reste
+        if (!t) return; // tâche disparue entre-temps : on ne touche à rien
+        // v16.1 : Google fait un SOFT-DELETE — un événement supprimé reste lisible avec status "cancelled" (le 404 ne vient qu'après purge). La preuve = 404, 410 OU cancelled.
+        var proven = (r.st === 404 || r.st === 410 || (r.st === 200 && r.ev && r.ev.status === "cancelled"));
+        if (proven) {
+          if (list[i].badgeOnly || t.localEdit || t.cat === "done") { if (!t.evGone) { t.evGone = true; persist(); } return; } // v16.1 : jamais retirée (badgeOnly / modifiée à la main / terminée) — mais suppression PROUVÉE → badge « plus dans l'agenda »
+          confirmed.push(t); return;
+        }
+        if (list[i].badgeOnly || t.localEdit || t.cat === "done") return; // pas de preuve et protégée : rien à faire, pas de toast non plus
         if (r.st === 200 && r.ev && !r.ev.error) {
+          kept++; // v16.1 : seul un 200 VALIDE est annoncé comme « déplacé »
           var ev = parseEvents({ items: [r.ev] })[0];
-          if (ev) {
+          if (ev && /^\d{4}-\d{2}-\d{2}$/.test(ev.day)) { // v16.1 : un événement annulé sans date ne corrompt plus la tâche (t.due ne peut plus partir en chaîne vide)
             var changed = false;
             var newTitle = stripEvTitle(ev.title);
             if (newTitle !== t.title) { t.title = newTitle; changed = true; }
             if (ev.day !== t.due) { t.due = ev.day; t.cat = catForDate(ev.day); changed = true; } // v16 : la tâche suit, même hors fenêtre
             if ((ev.until || null) !== (t.until || null)) { t.until = ev.until || null; changed = true; }
-            if (changed) { moved++; persist(); }
+            // v16.1 : le déplacé est TOTALEMENT suivi, même hors fenêtre — même mapping que le pull (revue v16 : heures et note restaient figées)
+            if (!ev.allDay) {
+              var vs16 = validHM(ev.startT), ve16 = validHM(ev.endT);
+              if (vs16 !== t.startT) { t.startT = vs16; changed = true; }
+              if (ve16 !== t.endT) { t.endT = ve16; changed = true; }
+            } else if (t.startT || t.endT) { t.startT = null; t.endT = null; changed = true; }
+            var newNote16 = buildEvNote(ev);
+            if (newNote16 !== (t.note || "")) { t.note = newNote16; changed = true; }
+            var rec161 = state.importedEvents[list[i].evId];
+            if (rec161 && rec161.day !== ev.day) { rec161.day = ev.day; changed = true; } // v16.1 : la trace suit la date réelle — plus de re-candidature à chaque balayage
+            if (changed) { moved++; save(); } // v16.1 : save() (pas persist) → le déplacement part aussi sur Drive pour l'autre appareil
           }
+        } else {
+          unverifiable++; // injoignable (st 0), 401, 429, 5xx… : AUCUNE preuve — jamais de retrait, jamais de « déplacé » (revue v16 : le toast mentait)
         }
       });
-      if (kept > 0) showToast("🛡️ " + kept + " tâche(s) conservée(s) : événement déplacé, pas supprimé" + (moved > 0 ? " — " + moved + " mise(s) à jour à la nouvelle date" : ""));
+      if (unverifiable > 0) showToast("🛡️ " + unverifiable + " tâche(s) non vérifiable(s) cette fois (réseau ?) — rien n'a été retiré");
+      else if (kept > 0) showToast("🛡️ " + kept + " tâche(s) conservée(s) : événement déplacé, pas supprimé" + (moved > 0 ? " — " + moved + " mise(s) à jour à la nouvelle date" : ""));
       if (confirmed.length > 3) { // garde-fou : il ne porte plus que sur les suppressions PROUVÉES
         var go = false;
         if (typeof confirm === "function") go = confirm("⚠️ " + confirmed.length + " tâche(s) liée(s) ont leur événement SUPPRIMÉ dans Google.\nC'est attendu si tu viens de supprimer beaucoup d'événements ou de changer de compte.\n\nRetirer ces " + confirmed.length + " tâche(s) ?");
@@ -2318,11 +2346,11 @@ function syncImportedFromCache(opts) { // v15 : opts.allowKill — les retraits 
       if (newNote !== (t.note || "")) { t.note = newNote; changed = true; }
       if (rec.day !== ev.day) { rec.day = ev.day; changed = true; } // v16 : la trace suit la date RÉELLE — un déplacement ne laisse plus rec.day pointer l'ancienne date
       if (changed) nUpd++;
-    } else if (allowKill && !t.localEdit && (rec.day || t.due) && (rec.day || t.due) >= today() && (rec.day || t.due) < horizon && t.cat !== "done" && killAllowed(t)) { // v16 : !localEdit — une tâche modifiée à la main n'est JAMAIS retirée automatiquement
+    } else if (allowKill && (rec.day || t.due) && (rec.day || t.due) >= today() && (rec.day || t.due) < horizon && t.cat !== "done" && killAllowed(t)) { // v16.1 : localEdit candidate aussi — pour le badge « disparu » uniquement (badgeOnly), jamais pour le retrait
       // v14 : l'événement d'ORIGINE (rec.day — PAS t.due, qui peut avoir été reportée localement) devait être dans
       // le cache et n'y est plus → il a été supprimé dans Google → la tâche suit (avant : juste un badge « disparu »).
       // rec.day évite de tuer une tâche reportée dont l'ancien événement, simplement passé de date, a quitté la fenêtre.
-      killQueue.push({ t: t, evId: evId }); // v16 : candidate — le retrait attend la PREUVE (verifyKills relit l'événement chez Google)
+      killQueue.push({ t: t, evId: evId, badgeOnly: t.localEdit === true }); // v16.1 : candidate — le retrait (ou le badge) attend la PREUVE (verifyKills : 404/410/status "cancelled")
     }
   });
   // v14 : sync bidirectionnelle des tâches LIÉES créées dans l'app (+📅) — les modifs faites dans Google Agenda
@@ -2330,15 +2358,16 @@ function syncImportedFromCache(opts) { // v15 : opts.allowKill — les retraits 
   state.tasks.slice().forEach(function (t) {
     if (!t.gEventId || t.autoImport || t.rep || t.repChild) return; // maîtres de séries et occurrences : jamais touchés par le pull
     if (String(t.gEventId).indexOf("_") >= 0) return; // id d'instance récurrente : le maître n'est pas dans le cache
-    if (t.cat === "done" || t.localEdit) return; // terminée = historique figé (l'événement reste dans l'agenda) ; modifs locales priment
+    if (t.cat === "done") return; // terminée = historique figé (l'événement reste dans l'agenda) ; v16.1 : localEdit traité plus bas (badge seulement)
     if (t.gSync === "pending") return; // un push est en attente : l'événement Google est peut-être juste décalé, on ne tue pas
     if (typeof syncInFlight === "object" && syncInFlight[t.id]) return; // envoi en cours : ne pas écraser
     if (t.pushedAt && fetchedAt && t.pushedAt > fetchedAt) return; // notre écriture est plus récente que le cache : rien à tirer
     var ev = byId[t.gEventId];
     if (!ev) {
-      if (allowKill && !t.localEdit && t.due && t.due >= today() && t.due < horizon && killAllowed(t)) killQueue.push({ t: t, evId: t.gEventId }); // v16 : + evId à prouver ; !localEdit redondant avec le return amont mais défensif
+      if (allowKill && t.due && t.due >= today() && t.due < horizon && killAllowed(t)) killQueue.push({ t: t, evId: t.gEventId, badgeOnly: t.localEdit === true }); // v16.1 : + evId à prouver ; localEdit → badge « disparu » uniquement
       return;
     }
+    if (t.localEdit) { if (t.evGone) { t.evGone = false; nUpd++; } return; } // v16.1 : l'événement est revenu dans le cache → le badge se lève ; les modifs locales priment toujours
     var changed = false;
     var newTitle = stripEvTitle(ev.title);
     if (newTitle !== t.title) { t.title = newTitle; changed = true; }
@@ -2564,11 +2593,12 @@ function tasksTabHtml() {
   var evs = (state.agendaCache && state.agendaCache.events) || [];
   var evToday = evs.filter(function (e) { // v16 : pas de doublon — un événement déjà couvert par une tâche active (importée ou liée) n'affiche qu'une ligne
     if (e.day !== td && !(e.until && e.day <= td && e.until >= td)) return false;
-    var own16 = state.importedEvents[e.id] ? getTask(state.importedEvents[e.id].taskId) : evOwnerTask(e);
+    var rec161b = state.importedEvents[e.id]; // v16.1 : une trace « taskId: null » (événement déjà possédé par une tâche de l'app) ne laisse plus passer le doublon
+    var own16 = ((rec161b && rec161b.taskId && getTask(rec161b.taskId)) || evOwnerTask(e));
     return !(own16 && own16.cat !== "done"); // une tâche ✓ laisse la rangée affichée (l'événement reste dans l'agenda)
   });
-  var rows = nowT.map(function (t) { return { k: "0" + (t.startT || "00:00"), h: taskHtml(t) }; })
-    .concat(evToday.map(function (e) { return { k: "1" + (e.startT || "00:00"), h: evRowHtml(e) }; }));
+  var rows = nowT.map(function (t) { return { k: (t.startT || "00:00") + "0", h: taskHtml(t) }; }) // v16.1 : tri PAR HORAIRE — un événement 08:00 s'affiche avant une tâche 09:00 (le suffixe départage les égalités, tâche d'abord)
+    .concat(evToday.map(function (e) { return { k: (e.startT || "00:00") + "1", h: evRowHtml(e) }; }));
   rows.sort(function (a, b) { return a.k < b.k ? -1 : (a.k > b.k ? 1 : 0); });
   if (rows.length > 0) {
     h += '<div class="tsec today">📋 Aujourd\'hui — ' + dayLongLabel(td) + " (" + nowT.length + " tâche(s) · " + evToday.length + " événement(s))</div>";
