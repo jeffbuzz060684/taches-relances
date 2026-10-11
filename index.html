@@ -531,8 +531,8 @@
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v15 : correctifs audit v14 — retraits seulement sur cache frais et horizon strict (timeMax Google EXCLUSIF : plus de tâche tuée au jour J-N), confirmation au-delà de 3 retraits, « sans toucher à l'agenda » = modifs protégées (localEdit), codes 🔐 conservés uniquement sur cet appareil (jamais Drive ni exports) =====
-var APP_VERSION = "v15";
+// ===== Tâches & Relances — v16 : audit v15 — PREUVE de suppression avant tout retrait (GET ciblé : 404/410 = retiré, 200 = déplacé → la tâche suit), localEdit protège du retrait et repart au push, purge des liens vivants, verrou Drive + rotation du fichier (historique de versions sans codes 🔐), plus de doublons dans Aujourd'hui =====
+var APP_VERSION = "v16";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -1373,7 +1373,7 @@ function keepLocalSecrets(merged, oldList) { // v15 : réinjecte les codes 🔐 
 }
 function exportData() {
   return {
-    app: "taches-relances", version: 15, tasks: state.tasks, lists: redactListsForExport(state.lists), // v15 : les éléments 🔐 ne quittent plus cet appareil
+    app: "taches-relances", version: 16, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version 16 = marqueur de rotation Drive (l'historique de l'ancien fichier ne suit pas)
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     tombstones: state.tombstones || [],
     savedAt: Date.now()
@@ -1431,7 +1431,10 @@ function purgeImportedEvents(map) {
   var cut = Date.now() - 60 * 86400000;
   var out = {};
   Object.keys(map || {}).forEach(function (k) {
-    if (!map[k] || !map[k].at || map[k].at >= cut) out[k] = map[k];
+    if (!map[k] || !map[k].at) return;
+    // v16 : une trace dont la tâche VIT encore n'expire JAMAIS — sinon l'importée de + 60 j perdait
+    // son suivi Google (plus de pull, plus de retrait, et la 2e boucle ignore les autoImport)
+    if (map[k].at >= cut || (map[k].taskId && getTask(map[k].taskId))) out[k] = map[k];
   });
   return out;
 }
@@ -1705,18 +1708,20 @@ function agendaRefresh(silent) {
     clearSyncError("agenda"); // synchro agenda réussie : la pastille redevient verte si elle était orange
     var nImp = 0, sync = null;
     if (state.autoAgenda) nImp = autoImportAll().n; // v13 : les occurrences de séries ne sont plus importées en masse
-    sync = syncImportedFromCache({ allowKill: true }); // v15 : TOUJOURS synchronisées, mais les retraits n'ont lieu QUE sur ce cache fraîchement téléchargé
+    sync = syncImportedFromCache({ allowKill: true }); // v15 : TOUJOURS synchronisées — les candidates au retrait attendent la preuve
     persist();
     renderAll();
     retryPendingSync();
-    if (!silent) {
-      var msg = "📅 Agenda à jour — " + state.agendaCache.events.length + " événement(s) sur " + agendaWindowDays() + " jours";
-      if (nImp > 0) msg += " · " + nImp + " tâche(s) importée(s)";
-      if (sync && sync.nUpd > 0) msg += " · " + sync.nUpd + " mise(s) à jour";
-      if (sync && sync.nKill > 0) msg += " · " + sync.nKill + " tâche(s) retirée(s) (événement supprimé)"; // v14
-      showToast(msg);
-    }
-    return true;
+    return verifyKills(sync.killQueue).then(function (nK) { // v16 : PREUVE de suppression chez Google avant tout retrait
+      if (!silent) {
+        var msg = "📅 Agenda à jour — " + state.agendaCache.events.length + " événement(s) sur " + agendaWindowDays() + " jours";
+        if (nImp > 0) msg += " · " + nImp + " tâche(s) importée(s)";
+        if (sync && sync.nUpd > 0) msg += " · " + sync.nUpd + " mise(s) à jour";
+        if (nK > 0) msg += " · " + nK + " tâche(s) retirée(s) (événement supprimé)";
+        showToast(msg);
+      }
+      return true;
+    });
   }).catch(function (e) {
     setSyncError("agenda", e); // pastille : 🟠 échec réseau/quota, 🔴 jeton refusé (invalid_grant)
     if (!silent) showToast("⚠️ Agenda indisponible — vérifie la configuration");
@@ -1865,6 +1870,7 @@ function taskToEvent(id) {
     t.gSync = "ok";
     t.gSyncedAt = Date.now();
     t.pushedAt = Date.now(); // v14 : notre écriture est plus récente que le cache agenda — le pull ne l'écrasera pas
+    if (!t.autoImport) t.localEdit = false; // v16 : l'état local vient d'être poussé — le pull reprend (les modifs Google suivent à nouveau)
     save();
     showToast("📅 Événement « " + t.title + " » " + (wasUpdate ? "mis à jour" : "créé") + " dans l'agenda — " + fmtDate(t.due)
       + (t.until && t.until !== t.due ? " → " + fmtDate(t.until) : "")
@@ -1934,12 +1940,15 @@ function driveFolderName() {
   var cfg = state.cfg || {};
   return (cfg.dFolder && String(cfg.dFolder).trim()) || DRIVE_DEFAULT_FOLDER;
 }
+var driveSending = false; // v16 : verrou local — un seul envoi Drive à la fois sur cet appareil (l'audit v15 : deux déclenchements entrelacés se lisaient/écrivaient dessus)
 function driveBackupNow(silent) {
   var cfg = state.cfg;
   if (!cfg || !cfg.dCid || !cfg.dRefresh) { if (!silent) showToast("⚠️ Configure d'abord la sauvegarde Drive"); return Promise.resolve(false); }
   var doSend = function () {
     var folderName = driveFolderName();
     var seq0 = _saveSeq; // v13 : un changement survenu PENDANT l'envoi ne doit pas rester non envoyé
+    if (driveSending) { _dirty = true; _saveSeq++; return Promise.resolve(false); } // v16 : un envoi est déjà en cours — celui-ci repartira après (via _saveSeq > seq0, pas un _dirty écrasé en fin d'envoi)
+    driveSending = true; // v16 : verrou posé AVANT le premier fetch
     var at = null, folderId = null, fileId = null;
     return oauthToken(cfg.dCid, cfg.dSecret || "", cfg.dRefresh).then(function (tk) {
       at = tk;
@@ -1963,9 +1972,19 @@ function driveBackupNow(silent) {
         if (tot > 0) { primeShadow(); persist(); renderAll(); } // v13 : fusionné AVANT de sérialiser ce qu'on envoie
       }
       var content = JSON.stringify(exportData(), null, 2);
+      // v16 : rotation — si le fichier distant date d'avant la v16, son HISTORIQUE DE VERSIONS (~30 j chez Google)
+      // contient peut-être des codes 🔐 en clair (les sauvegardes v14 et plus anciennes les embarquaient).
+      // Un fichier NEUF repart avec un historique vierge ; l'ancien part à la corbeille Drive (à vider manuellement
+      // pour tout effacer). Le 2e appareil voit ensuite version >= 16 → PATCH normal, plus de rotation.
+      if (fileId && remote && !((remote.version || 0) >= 16)) {
+        return driveDeleteFile(at, fileId)
+          .then(function () { return driveCreateFile(at, folderId, content); })
+          .then(function () { return "recréé — historique de versions vierge, codes 🔐 absents"; });
+      }
       if (fileId) return driveUpdateFile(at, fileId, content).then(function () { return "mis à jour"; });
       return driveCreateFile(at, folderId, content).then(function () { return "créé"; });
     }).then(function (res) {
+      driveSending = false; // v16 : verrou libéré
       state.driveSyncedAt = Date.now();
       _dirty = _saveSeq > seq0; // v13 : des modifs sont survenues pendant l'envoi → on repart tout de suite
       if (_dirty) scheduleDriveBackup();
@@ -1973,7 +1992,7 @@ function driveBackupNow(silent) {
       persist();
       if (!silent) showToast("☁️ Sauvegardé sur Drive — « " + DRIVE_FILE_NAME + " » dans " + folderName + " (" + res + ")");
       return true;
-    });
+    }).catch(function (e) { driveSending = false; throw e; }); // v16 : verrou libéré aussi en échec
   };
   // jamais d'écrasement Drive sans fusion préalable réussie (sinon un appareil à jour vide écraserait tout)
   if (driveMergedOk) return doSend().catch(function (e) {
@@ -2062,6 +2081,12 @@ function driveFindFile(at, folderId) {
   return agendaFetch(url, { headers: { "Authorization": "Bearer " + at } }).then(function (data) {
     var files = (data && Array.isArray(data.files)) ? data.files : [];
     return files.length > 0 ? files[0] : null;
+  });
+}
+function driveDeleteFile(at, fileId) { // v16 : rotation de la sauvegarde — l'historique de versions de l'ancien fichier ne suit pas
+  return fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId), { method: "DELETE", headers: { "Authorization": "Bearer " + at } }).then(function (r) {
+    if (r.status !== 200 && r.status !== 204) throw new Error("suppression Drive refusée");
+    return true;
   });
 }
 function driveCreateFile(at, folderId, content) {
@@ -2217,6 +2242,50 @@ function killLinkedTask(id) {
   showToast("🗑️ Supprimé dans l'agenda — la tâche « " + t.title + " » a suivi", { action: "Annuler", ttl: 5000 });
   return true;
 }
+// v16 : PREUVE avant retrait — pour chaque candidate, relire l'événement par son id chez Google.
+// 404/410 = réellement supprimé → retrait (avec garde-fou > 3) ; 200 = déplacé hors fenêtre → la tâche
+// reste et suit sa nouvelle date ; réseau injoignable = AUCUN retrait (vérification impossible = conserver).
+function verifyKills(cands) {
+  var list = (cands || []).filter(function (c) { return c && c.t && c.evId && getTask(c.t.id); });
+  if (!list.length) return Promise.resolve(0);
+  var cfg = state.cfg;
+  if (!cfg || !cfg.cid || !cfg.refresh) return Promise.resolve(0);
+  return agendaAccessToken(cfg).then(function (at) {
+    return Promise.all(list.map(function (c) {
+      return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(c.evId), { headers: { "Authorization": "Bearer " + at } })
+        .then(function (r) { return r.json().then(function (j) { return { st: r.status, ev: j }; }).catch(function () { return { st: r.status, ev: null }; }); })
+        .catch(function () { return { st: 0, ev: null }; }); // st 0 = injoignable → on ne touche à rien
+    })).then(function (rs) {
+      var confirmed = [], kept = 0, moved = 0;
+      rs.forEach(function (r, i) {
+        var t = getTask(list[i].t.id);
+        if (!t || t.localEdit || t.cat === "done") return; // état changé ou protégé entre-temps : on ne touche à rien
+        if (r.st === 404 || r.st === 410) { confirmed.push(t); return; }
+        kept++; // 200 = l'événement existe (déplacé) OU injoignable : la tâche reste
+        if (r.st === 200 && r.ev && !r.ev.error) {
+          var ev = parseEvents({ items: [r.ev] })[0];
+          if (ev) {
+            var changed = false;
+            var newTitle = stripEvTitle(ev.title);
+            if (newTitle !== t.title) { t.title = newTitle; changed = true; }
+            if (ev.day !== t.due) { t.due = ev.day; t.cat = catForDate(ev.day); changed = true; } // v16 : la tâche suit, même hors fenêtre
+            if ((ev.until || null) !== (t.until || null)) { t.until = ev.until || null; changed = true; }
+            if (changed) { moved++; persist(); }
+          }
+        }
+      });
+      if (kept > 0) showToast("🛡️ " + kept + " tâche(s) conservée(s) : événement déplacé, pas supprimé" + (moved > 0 ? " — " + moved + " mise(s) à jour à la nouvelle date" : ""));
+      if (confirmed.length > 3) { // garde-fou : il ne porte plus que sur les suppressions PROUVÉES
+        var go = false;
+        if (typeof confirm === "function") go = confirm("⚠️ " + confirmed.length + " tâche(s) liée(s) ont leur événement SUPPRIMÉ dans Google.\nC'est attendu si tu viens de supprimer beaucoup d'événements ou de changer de compte.\n\nRetirer ces " + confirmed.length + " tâche(s) ?");
+        if (!go) { confirmed = []; showToast("🛡️ Rien n'a été retiré — vérifie dans Google Agenda puis relance 🔄"); }
+      }
+      var n = 0;
+      confirmed.forEach(function (t) { if (killAllowed(t)) { killLinkedTask(t.id); n++; } });
+      return n;
+    });
+  });
+}
 function syncImportedFromCache(opts) { // v15 : opts.allowKill — les retraits ne se font QUE sur un cache fraîchement téléchargé (agendaRefresh)
   opts = opts || {};
   var evs = (state.agendaCache && state.agendaCache.events) || [];
@@ -2247,12 +2316,13 @@ function syncImportedFromCache(opts) { // v15 : opts.allowKill — les retraits 
       } else if (t.startT || t.endT) { t.startT = null; t.endT = null; changed = true; }
       var newNote = buildEvNote(ev);
       if (newNote !== (t.note || "")) { t.note = newNote; changed = true; }
+      if (rec.day !== ev.day) { rec.day = ev.day; changed = true; } // v16 : la trace suit la date RÉELLE — un déplacement ne laisse plus rec.day pointer l'ancienne date
       if (changed) nUpd++;
-    } else if (allowKill && (rec.day || t.due) && (rec.day || t.due) >= today() && (rec.day || t.due) < horizon && t.cat !== "done" && killAllowed(t)) { // v15 : < horizon — timeMax Google est EXCLUSIF : le jour limite entier est hors cache (off-by-one v14)
+    } else if (allowKill && !t.localEdit && (rec.day || t.due) && (rec.day || t.due) >= today() && (rec.day || t.due) < horizon && t.cat !== "done" && killAllowed(t)) { // v16 : !localEdit — une tâche modifiée à la main n'est JAMAIS retirée automatiquement
       // v14 : l'événement d'ORIGINE (rec.day — PAS t.due, qui peut avoir été reportée localement) devait être dans
       // le cache et n'y est plus → il a été supprimé dans Google → la tâche suit (avant : juste un badge « disparu »).
       // rec.day évite de tuer une tâche reportée dont l'ancien événement, simplement passé de date, a quitté la fenêtre.
-      killQueue.push(t); // v15 : la suppression attend la décision groupée
+      killQueue.push({ t: t, evId: evId }); // v16 : candidate — le retrait attend la PREUVE (verifyKills relit l'événement chez Google)
     }
   });
   // v14 : sync bidirectionnelle des tâches LIÉES créées dans l'app (+📅) — les modifs faites dans Google Agenda
@@ -2266,7 +2336,7 @@ function syncImportedFromCache(opts) { // v15 : opts.allowKill — les retraits 
     if (t.pushedAt && fetchedAt && t.pushedAt > fetchedAt) return; // notre écriture est plus récente que le cache : rien à tirer
     var ev = byId[t.gEventId];
     if (!ev) {
-      if (allowKill && t.due && t.due >= today() && t.due < horizon && killAllowed(t)) killQueue.push(t); // v15 : < horizon (timeMax exclusif) + cache frais exigé
+      if (allowKill && !t.localEdit && t.due && t.due >= today() && t.due < horizon && killAllowed(t)) killQueue.push({ t: t, evId: t.gEventId }); // v16 : + evId à prouver ; !localEdit redondant avec le return amont mais défensif
       return;
     }
     var changed = false;
@@ -2281,16 +2351,11 @@ function syncImportedFromCache(opts) { // v15 : opts.allowKill — les retraits 
     } else if (t.startT || t.endT) { t.startT = null; t.endT = null; changed = true; }
     if (changed) nUpd++;
   });
-  // v15 : garde-fou — un changement de compte Google fait disparaître TOUTE la fenêtre d'un coup :
-  // au-delà de 3 retraits, rien ne se fait sans confirmation explicite (avant : suppression en masse silencieuse)
-  if (killQueue.length > 3) {
-    var goKill = true;
-    if (typeof confirm === "function") goKill = confirm("⚠️ " + killQueue.length + " tâche(s) liée(s) auraient leur événement absent de l'agenda.\nC'est attendu si tu viens de supprimer beaucoup d'événements ou de changer de compte Google.\n\nRetirer ces " + killQueue.length + " tâche(s) ?");
-    if (!goKill) { killQueue = []; showToast("🛡️ Rien n'a été retiré — vérifie dans Google Agenda puis relance 🔄"); }
-  }
-  killQueue.forEach(function (t) { if (killAllowed(t)) { killLinkedTask(t.id); nKill++; } });
-  if (nUpd > 0 || nGone > 0 || nKill > 0) persist();
-  return { nUpd: nUpd, nGone: nGone, nKill: nKill };
+  if (nUpd > 0 || nGone > 0) persist();
+  // v16 : AUCUN retrait ici — l'absence du cache n'est pas une preuve de suppression (l'événement peut être
+  // déplacé hors fenêtre). verifyKills() relit chaque candidat chez Google : 404/410 = supprimé → retrait
+  // (garde-fou > 3 sur les retraits PROUVÉS uniquement) ; 200 = déplacé → la tâche reste et suit sa nouvelle date.
+  return { nUpd: nUpd, nGone: nGone, nKill: 0, killQueue: killQueue };
 }
 function eventToTask(evId) {
   var ev = findEvent(evId);
@@ -2497,7 +2562,11 @@ function tasksTabHtml() {
   }
   // v13 : les événements d'aujourd'hui s'affichent EN LIGNE au milieu des tâches horodatées (le ＋ en fait une tâche)
   var evs = (state.agendaCache && state.agendaCache.events) || [];
-  var evToday = evs.filter(function (e) { return e.day === td || (e.until && e.day <= td && e.until >= td); });
+  var evToday = evs.filter(function (e) { // v16 : pas de doublon — un événement déjà couvert par une tâche active (importée ou liée) n'affiche qu'une ligne
+    if (e.day !== td && !(e.until && e.day <= td && e.until >= td)) return false;
+    var own16 = state.importedEvents[e.id] ? getTask(state.importedEvents[e.id].taskId) : evOwnerTask(e);
+    return !(own16 && own16.cat !== "done"); // une tâche ✓ laisse la rangée affichée (l'événement reste dans l'agenda)
+  });
   var rows = nowT.map(function (t) { return { k: "0" + (t.startT || "00:00"), h: taskHtml(t) }; })
     .concat(evToday.map(function (e) { return { k: "1" + (e.startT || "00:00"), h: evRowHtml(e) }; }));
   rows.sort(function (a, b) { return a.k < b.k ? -1 : (a.k > b.k ? 1 : 0); });
