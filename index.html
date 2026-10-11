@@ -26,7 +26,7 @@
   }
   header .left { display: flex; align-items: baseline; gap: 8px; }
   header h1 { font-size: 20px; font-weight: 700; }
-  .badge { font-size: 12px; color: #94a3b8; font-weight: 400; }
+  .badge { font-size: 12px; color: #b3c0d1; font-weight: 400; }
   .agbtn {
     background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
     border-radius: 10px; padding: 6px 10px; font-size: 16px; cursor: pointer;
@@ -34,20 +34,21 @@
   .wrap { max-width: 560px; margin: 0 auto; }
   .hidden { display: none !important; }
   #tabbar {
-    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 5px;
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px;
     padding: 10px 10px 6px; max-width: 560px; margin: 0 auto;
   }
   .tab {
     border: 1px solid #1e293b; background: #0f172a; color: #cbd5e1;
     border-radius: 12px; padding: 7px 2px; font-size: 11px; font-weight: 600;
     cursor: pointer; text-align: center; line-height: 1.4;
+    font-family: inherit; appearance: none; -webkit-appearance: none; width: 100%;
   }
   .tab .n { display: block; font-size: 15px; font-weight: 800; }
   .tab.active.urgent { border-color: #fb7185; color: #fb7185; background: rgba(251,113,133,0.08); }
   .tab.active.week   { border-color: #fbbf24; color: #fbbf24; background: rgba(251,191,36,0.08); }
   .tab.active.later  { border-color: #34d399; color: #34d399; background: rgba(52,211,153,0.08); }
   .tab.active.lists  { border-color: #a78bfa; color: #a78bfa; background: rgba(167,139,250,0.08); }
-  .tab.active.done   { border-color: #94a3b8; color: #e2e8f0; background: rgba(148,163,184,0.08); }
+  .tab.active.done   { border-color: #b3c0d1; color: #e2e8f0; background: rgba(148,163,184,0.08); }
   #list, #agBody, #listDetail { padding: 8px 12px; max-width: 560px; margin: 0 auto; }
   .task {
     background: #0f172a; border: 1px solid #1e293b; border-radius: 14px;
@@ -59,8 +60,8 @@
   .task.done   { border-left: 4px solid #475569; opacity: 0.75; }
   .task .body { flex: 1; min-width: 0; }
   .task .title { font-size: 15px; font-weight: 600; word-wrap: break-word; }
-  .task.done .title { text-decoration: line-through; color: #94a3b8; }
-  .task .note { font-size: 13px; color: #94a3b8; margin-top: 2px; white-space: pre-wrap; word-wrap: break-word; }
+  .task.done .title { text-decoration: line-through; color: #b3c0d1; }
+  .task .note { font-size: 13px; color: #b3c0d1; margin-top: 2px; white-space: pre-wrap; word-wrap: break-word; }
   .task .meta { font-size: 11px; color: #64748b; margin-top: 5px; }
   .task .meta .rep { color: #fbbf24; }
   .task .meta .late { color: #fb7185; font-weight: 700; }
@@ -87,7 +88,7 @@
   .listcard .row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
   .bar { flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; }
   .bar > div { height: 100%; background: #34d399; border-radius: 4px; transition: width 0.3s; }
-  .listcard .cnt { font-size: 12px; color: #94a3b8; white-space: nowrap; }
+  .listcard .cnt { font-size: 12px; color: #b3c0d1; white-space: nowrap; }
   .listcard .acts { flex-direction: row; margin-top: 8px; }
   .item {
     display: flex; align-items: center; gap: 10px;
@@ -109,13 +110,13 @@
     border-radius: 10px; padding: 10px 14px; font-size: 14px; cursor: pointer;
   }
   .addrow .sectgl {
-    background: #0f172a; border: 1px dashed #fbbf24; color: #94a3b8; padding: 10px 12px;
+    background: #0f172a; border: 1px dashed #fbbf24; color: #b3c0d1; padding: 10px 12px;
   }
   .addrow .sectgl.on { background: #fbbf24; color: #020617; border-style: solid; }
   .item .min { background: transparent; border: none; color: #64748b; cursor: pointer; padding: 2px 3px; font-size: 13px; }
   .item .min:disabled { opacity: 0.25; cursor: default; }
   .item .qty { color: #38bdf8; font-weight: 700; }
-  .item .masked { color: #94a3b8; letter-spacing: 2px; }
+  .item .masked { color: #b3c0d1; letter-spacing: 2px; }
   .item.secret { border-left: 3px dashed #fbbf24; }
   .listcard .tpl { font-size: 10px; color: #fbbf24; border: 1px solid #fbbf24; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
   .searchrow { display: flex; gap: 8px; padding: 0 12px 8px; max-width: 560px; margin: 0 auto; }
@@ -123,11 +124,11 @@
     flex: 1; background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
     border-radius: 10px; padding: 9px 12px; font-size: 14px; font-family: inherit;
   }
-  .searchrow button { background: #1e293b; border: none; color: #94a3b8; border-radius: 10px; padding: 0 12px; cursor: pointer; }
+  .searchrow button { background: #1e293b; border: none; color: #b3c0d1; border-radius: 10px; padding: 0 12px; cursor: pointer; }
   .ld-head { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
   .ld-head .t { flex: 1; min-width: 0; }
   .ld-head h2 { font-size: 17px; word-wrap: break-word; }
-  .ld-head .cnt { font-size: 12px; color: #94a3b8; }
+  .ld-head .cnt { font-size: 12px; color: #b3c0d1; }
   .ld-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
   .ld-foot .rowbtn, .ld-foot button {
     border: 1px solid #334155; background: #0f172a; color: #cbd5e1;
@@ -154,7 +155,7 @@
   }
   .ev .ev-b { flex: 1; min-width: 0; }
   .ev .title { font-size: 14px; font-weight: 600; word-wrap: break-word; }
-  .ev .meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .ev .meta { font-size: 12px; color: #b3c0d1; margin-top: 2px; }
   .ev .chk { flex: 0 0 30px; height: 30px; background: #38bdf8; border-color: #38bdf8; color: #020617; }
   .ag-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
   .ag-actions button, .cfg-card button {
@@ -166,7 +167,7 @@
     padding: 14px; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;
   }
   .cfg-card .h { font-size: 14px; font-weight: 700; }
-  .cfg-card .hint { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+  .cfg-card .hint { font-size: 12px; color: #b3c0d1; line-height: 1.5; }
   .cfg-card input {
     background: #020617; border: 1px solid #334155; color: #e2e8f0;
     border-radius: 10px; padding: 10px; font-size: 14px; width: 100%; font-family: inherit;
@@ -177,7 +178,7 @@
     border-radius: 10px; padding: 10px; font-size: 14px; width: 100%;
     font-family: inherit; margin-bottom: 8px;
   }
-  .data-card .hint { font-size: 12px; color: #94a3b8; line-height: 1.5; margin-bottom: 8px; }
+  .data-card .hint { font-size: 12px; color: #b3c0d1; line-height: 1.5; margin-bottom: 8px; }
   .data-card .hint code { color: #38bdf8; word-break: break-all; }
   .listcard.sub { margin-left: 22px; border-left-style: dashed; }
   .listcard.sub .name { font-size: 14px; }
@@ -192,7 +193,7 @@
     background: #0f172a; border: 1px solid #1e293b; border-radius: 14px;
     padding: 12px; margin: 6px 12px 16px; max-width: 560px; margin-left: auto; margin-right: auto;
   }
-  .data-card .lbl { font-size: 13px; color: #94a3b8; margin-bottom: 8px; }
+  .data-card .lbl { font-size: 13px; color: #b3c0d1; margin-bottom: 8px; }
   .data-card .btns { display: flex; gap: 8px; flex-wrap: wrap; }
   .data-card button {
     border: 1px solid #334155; background: #020617; color: #e2e8f0;
@@ -223,7 +224,7 @@
     font-family: inherit; color-scheme: dark;
   }
   .sheet textarea { min-height: 64px; resize: vertical; }
-  .sheet .flabel { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .sheet .flabel { font-size: 12px; color: #b3c0d1; margin-top: 2px; }
   .cat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
   .cat-row label {
     display: block; text-align: center; font-size: 12px; font-weight: 600;
@@ -236,7 +237,7 @@
   .sheet .row .cancel { background: #1e293b; color: #e2e8f0; }
   .sheet .row .ok { background: #38bdf8; color: #020617; }
   .sheet .agadd {
-    width: 100%; border: 1px dashed #334155; background: #020617; color: #94a3b8;
+    width: 100%; border: 1px dashed #334155; background: #020617; color: #b3c0d1;
     border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600; cursor: pointer;
   }
   .sheet .time-row, .sheet .rep-row { display: flex; gap: 10px; }
@@ -264,6 +265,79 @@
   .syncline { font-size: 12px; color: #64748b; padding: 0 2px 6px; }
   .task .meta .pend { color: #38bdf8; font-weight: 700; }
   .task .meta .gone { color: #fb7185; font-weight: 700; }
+  .hbtns { display: flex; gap: 8px; align-items: center; }
+  .syncpill { font-size: 15px; cursor: pointer; line-height: 1; }
+  /* cibles tactiles ≥ 44 px (audit) */
+  .acts button, .rowbtn, .ld-foot button, .ag-actions button, .cfg-card button,
+  .data-card button, .subchips button, .addrow button, .chips .chip { min-height: 44px; }
+  .item .min, .item .del { min-width: 40px; min-height: 40px; }
+  .task .acts { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
+  .task .chk { flex: 0 0 36px; height: 36px; }
+  .item .chk { flex: 0 0 32px; height: 32px; }
+  /* saisie rapide + report + édition d'item */
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chips .chip {
+    border: 1px solid #334155; background: #020617; color: #cbd5e1;
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .chips .chip.on { border-color: #38bdf8; background: rgba(56,189,248,0.16); color: #e2e8f0; }
+  .chips input[type=date] {
+    flex: 1; min-width: 130px; background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 14px; font-family: inherit; color-scheme: dark;
+  }
+  .qag { font-size: 13px; color: #cbd5e1; display: flex; gap: 8px; align-items: center; }
+  .qag input { width: 18px; height: 18px; }
+  /* écran Aujourd'hui */
+  .tsec {
+    font-size: 13px; font-weight: 700; color: #38bdf8; margin: 16px 0 8px;
+    border-bottom: 1px solid #1e293b; padding-bottom: 6px;
+  }
+  .tsec-hint { font-size: 12px; color: #b3c0d1; padding: 4px 2px 10px; }
+  /* toast avec bouton d'action (Annuler) */
+  #toast.act { pointer-events: auto; }
+  #toast button {
+    margin-left: 10px; border: none; background: #38bdf8; color: #020617;
+    border-radius: 8px; padding: 6px 12px; font-weight: 700; cursor: pointer;
+  }
+  /* ---------- Thème clair ☀️ ---------- */
+  html.light { color-scheme: light; }
+  html.light body { background: #eef2f7; color: #1e293b; }
+  html.light header { background: rgba(238,242,247,0.94); border-bottom-color: #cbd5e1; }
+  html.light .badge { color: #64748b; }
+  html.light .agbtn { background: #ffffff; border-color: #cbd5e1; color: #1e293b; }
+  html.light .tab { background: #ffffff; border-color: #cbd5e1; color: #334155; }
+  html.light .tab.active.today { border-color: #38bdf8; color: #0369a1; background: rgba(56,189,248,0.12); }
+  html.light .tab.active.urgent { border-color: #fb7185; color: #be123c; background: rgba(251,113,133,0.10); }
+  html.light .tab.active.week { border-color: #fbbf24; color: #b45309; background: rgba(251,191,36,0.10); }
+  html.light .tab.active.later { border-color: #34d399; color: #047857; background: rgba(52,211,153,0.10); }
+  html.light .tab.active.lists { border-color: #a78bfa; color: #6d28d9; background: rgba(167,139,250,0.10); }
+  html.light .tab.active.done { border-color: #94a3b8; color: #334155; background: rgba(100,116,139,0.10); }
+  html.light .task, html.light .listcard, html.light .item, html.light .ev, html.light .cfg-card, html.light .data-card { background: #ffffff; border-color: #dbe2ea; }
+  html.light .task .note, html.light .cfg-card .hint, html.light .data-card .hint, html.light .sheet .flabel { color: #64748b; }
+  html.light .task.done .title { color: #64748b; }
+  html.light .acts button, html.light .rowbtn, html.light .ld-foot button, html.light .ag-actions button,
+  html.light .cfg-card button, html.light .data-card button { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
+  html.light .empty { color: #64748b; }
+  html.light .bar { background: #dbe2ea; }
+  html.light .listcard .cnt, html.light .ld-head .cnt { color: #64748b; }
+  html.light .addrow input, html.light .searchrow input, html.light .cfg-card input, html.light .data-card input { background: #ffffff; border-color: #cbd5e1; color: #1e293b; }
+  html.light .searchrow button { background: #e2e8f0; color: #475569; }
+  html.light .sheet { background: #ffffff; border-color: #cbd5e1; }
+  html.light .sheet input[type=text], html.light .sheet input[type=date], html.light .sheet input[type=number], html.light .sheet textarea,
+  html.light .sheet .time-row input, html.light .sheet .rep-row input, html.light .sheet select,
+  html.light .ag-actions select, html.light .ag-actions option { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; color-scheme: light; }
+  html.light .sheet .row .cancel { background: #e2e8f0; color: #1e293b; }
+  html.light .sheet .agadd { background: #f8fafc; color: #64748b; border-color: #cbd5e1; }
+  html.light .chips .chip { background: #f8fafc; border-color: #cbd5e1; color: #334155; }
+  html.light .chips .chip.on { border-color: #0284c7; background: rgba(2,132,199,0.12); color: #0f172a; }
+  html.light .chips input[type=date] { background: #ffffff; border-color: #cbd5e1; color: #1e293b; color-scheme: light; }
+  html.light .day-h { border-bottom-color: #cbd5e1; }
+  html.light .day-h.today { border-bottom-color: #bbf7d0; }
+  html.light .subchips button { background: #ffffff; color: #6d28d9; }
+  html.light .tsec { border-bottom-color: #cbd5e1; color: #0369a1; }
+  html.light .tsec-hint { color: #64748b; }
+  html.light .item .del { color: #64748b; }
   #toast {
     position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
     background: #1e293b; color: #f8fafc; border: 1px solid #334155;
@@ -280,7 +354,11 @@
     <h1>📋 Mes tâches</h1>
     <span class="badge">💾 auto · <span id="vBadge"></span></span>
   </div>
-  <button class="agbtn" onclick="showView('agenda')">📅</button>
+  <div class="hbtns">
+    <span id="syncPill" class="syncpill" onclick="showView('agenda')" title="Synchro Google">🟠</span>
+    <button id="themeBtn" class="agbtn" title="Thème clair / sombre" onclick="toggleTheme()">🌙</button>
+    <button class="agbtn" onclick="showView('agenda')" title="Agenda Google">📅</button>
+  </div>
 </header>
 <div id="view-tasks" class="wrap">
   <nav id="tabbar"></nav>
@@ -311,7 +389,7 @@
 </div>
 <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="handleImport(event)">
 <button id="fab" onclick="onFab()">＋</button>
-<div id="modal" class="modal hidden">
+<div id="modal" class="modal hidden" onclick="if(event.target===this)closeModal()">
   <div class="sheet">
     <div class="st" id="mLabel">Nouvelle tâche</div>
     <input type="text" id="mTitle" placeholder="Que faut-il faire ?">
@@ -349,7 +427,7 @@
     <button class="agadd" onclick="saveModal(false)">Enregistrer sans toucher à l'agenda</button>
   </div>
 </div>
-<div id="listModal" class="modal hidden">
+<div id="listModal" class="modal hidden" onclick="if(event.target===this)closeListModal()">
   <div class="sheet">
     <div class="st" id="lLabel">Nouvelle liste</div>
     <input type="text" id="lName" placeholder="Nom de la liste (ex : Matériel manœuvre)">
@@ -359,7 +437,7 @@
     </div>
   </div>
 </div>
-<div id="evModal" class="modal hidden">
+<div id="evModal" class="modal hidden" onclick="if(event.target===this)closeEvModal()">
   <div class="sheet">
     <div class="st" id="eLabel">Modifier l'événement</div>
     <input type="text" id="eTitle" placeholder="Titre de l'événement">
@@ -380,17 +458,67 @@
     </div>
   </div>
 </div>
+<div id="quickModal" class="modal hidden" onclick="if(event.target===this)closeQuickAdd()">
+  <div class="sheet">
+    <div class="st">➕ Nouvelle tâche</div>
+    <input type="text" id="qTitle" placeholder="Que faut-il faire ?" onkeydown="if(event.key==='Enter'){quickSave()}">
+    <div class="chips">
+      <button id="q-today" class="chip on" onclick="quickPick('today')">Aujourd'hui</button>
+      <button id="q-tomorrow" class="chip" onclick="quickPick('tomorrow')">Demain</button>
+      <button id="q-week" class="chip" onclick="quickPick('week')">+7 jours</button>
+      <button id="q-none" class="chip" onclick="quickPick('none')">Sans date</button>
+      <input type="date" id="qDate" onchange="quickDateChange()">
+    </div>
+    <div class="chips">
+      <button id="qt-perso" class="chip on" onclick="quickPickType('perso')">🔵 Perso</button>
+      <button id="qt-pro" class="chip" onclick="quickPickType('pro')">🔴 Pro</button>
+    </div>
+    <label class="qag"><input type="checkbox" id="qAgenda"> Ajouter à l'agenda Google aussi</label>
+    <div class="row">
+      <button class="cancel" onclick="quickMore()">⚙️ Plus d'options</button>
+      <button class="ok" onclick="quickSave()">💾 Ajouter</button>
+    </div>
+  </div>
+</div>
+<div id="deferModal" class="modal hidden" onclick="if(event.target===this)closeDeferSheet()">
+  <div class="sheet">
+    <div class="st">⬅️ Reporter la tâche</div>
+    <div class="row">
+      <button class="cancel" onclick="deferBy(1)">Demain</button>
+      <button class="cancel" onclick="deferBy(7)">+7 jours</button>
+      <button class="cancel" onclick="deferBy(14)">+14 jours</button>
+    </div>
+    <div class="time-row">
+      <input type="date" id="dfrDate">
+      <button class="ok" style="flex:1;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;background:#38bdf8;color:#020617" onclick="deferPicked()">OK</button>
+    </div>
+  </div>
+</div>
+<div id="itemModal" class="modal hidden" onclick="if(event.target===this)closeItemModal()">
+  <div class="sheet">
+    <div class="st" id="iLabel">Modifier l'élément</div>
+    <input type="text" id="iText" placeholder="Texte de l'élément">
+    <div class="time-row">
+      <input type="number" id="iQty" min="1" max="999" placeholder="Quantité (optionnel)">
+    </div>
+    <label class="qag"><input type="checkbox" id="iSecret"> Code masqué 🔐</label>
+    <div class="row">
+      <button class="cancel" onclick="closeItemModal()">Annuler</button>
+      <button class="ok" onclick="saveItemModal()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v8 : fiabilisation (dédoublonnage agenda↔tâches, erreurs API lues comme telles + pagination, fusion Drive updatedAt + pierres tombales + fusion avant envoi, anti-doublon d'événements + cache token, codes sans quantité, sous-listes récursives copiées, modales mobiles, ids validés, sauvegarde locale vérifiée, fenêtre agenda depuis minuit) =====
-var APP_VERSION = "v8";
+// ===== Tâches & Relances — v10 : UX (écran ⭐ Aujourd'hui, saisie rapide, vrai Reporter ⬅️, Annuler 5 s, pastille synchro 🔴🟠🟢, occurrence suivante des répétitions, listes : collage en lot + édition + masquer cochés + progression totale + Partager, thème clair ☀️, contraste, cibles 44 px, onglets accessibles, badge d'icône, Échap/fond = fermer, toast mise à jour SW) =====
+var APP_VERSION = "v10";
 var KEY = "taches-relances-v2";
-var TABS = ["urgent", "week", "later", "lists", "done"];
+var TABS = ["today", "urgent", "week", "later", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
-var CAT_LABELS = { urgent: "🔴 Urgent", week: "🟠 Semaine", later: "🟢 Plus tard", lists: "🧺 Listes", done: "✅ Terminé" };
-var CAT_SHORT = { urgent: "Urgent", week: "Semaine", later: "Plus tard", done: "Terminé" };
+var CAT_LABELS = { today: "⭐ Auj.", urgent: "🔴 Urgent", week: "🟠 Semaine", later: "🟢 Plus tard", lists: "🧺 Listes", done: "✅ Terminé" };
+var CAT_SHORT = { today: "Aujourd'hui", urgent: "Urgent", week: "Semaine", later: "Plus tard", done: "Terminé" };
 var TYPES = ["pro", "perso"];
 var TYPE_LABELS = { pro: "🔴 Pro", perso: "🔵 Perso" };
 var DRIVE_FILE_NAME = "taches-relances.json";
@@ -421,6 +549,22 @@ function addDaysISO(iso, n) {
   var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
   d.setDate(d.getDate() + n);
   return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+// +1 mois (occurrence suivante des tâches mensuelles) — le jour est borné au dernier jour du mois
+function addMonthsISO(iso, n) {
+  var p = String(iso).split("-");
+  var y = parseInt(p[0], 10), m0 = parseInt(p[1], 10) - 1, d = parseInt(p[2], 10);
+  var base = new Date(y, m0 + n, 1);
+  var last = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+  base.setDate(Math.min(d, last));
+  return base.getFullYear() + "-" + pad2(base.getMonth() + 1) + "-" + pad2(base.getDate());
+}
+// catégorie déduite de la date : passé/aujourd'hui → Urgent, cette semaine → Semaine, au-delà → Plus tard
+function catForDate(iso) {
+  var td = today();
+  if (!iso || iso <= td) return "urgent";
+  if (iso <= addDaysISO(td, 7)) return "week";
+  return "later";
 }
 function fmtDate(iso) {
   if (!iso || typeof iso !== "string" || iso.length < 10) return "";
@@ -539,7 +683,8 @@ function normalize(p) {
     autoBackup: p.autoBackup !== false,
     hideWarn: p.hideWarn === true,
     pendingEventDeletes: Array.isArray(p.pendingEventDeletes) ? p.pendingEventDeletes : [],
-    driveSyncedAt: p.driveSyncedAt || null
+    driveSyncedAt: p.driveSyncedAt || null,
+    syncError: (p.syncError && typeof p.syncError === "object") ? p.syncError : null
   };
 }
 function load() {
@@ -568,7 +713,8 @@ function persist() {
       hideWarn: state.hideWarn === true,
       pendingEventDeletes: state.pendingEventDeletes || [],
       tombstones: state.tombstones || [],
-      driveSyncedAt: state.driveSyncedAt || null
+      driveSyncedAt: state.driveSyncedAt || null,
+      syncError: state.syncError || null
     }));
   } catch (e) {
     // quota localStorage dépassé ou stockage refusé : ne jamais rester silencieux
@@ -616,7 +762,7 @@ function storedSavedAt() {
   } catch (e) { return 0; }
 }
 var state = load();
-var tab = "urgent";
+var tab = "today"; // accueil = écran ⭐ Aujourd'hui (retards + événements + tâches du jour)
 var view = "tasks";        // "tasks" | "agenda" | "list"
 var currentListId = null;  // liste ouverte en détail
 var editId = null;         // tâche éditée
@@ -748,21 +894,55 @@ function editTask(id, title, note, cat, due, type, extra) {
   save();
   return true;
 }
+// ---------- Annuler (5 s) : le dernier ✓ ou 🗑️ peut être annulé ----------
+var _undo = null;
+function snapshotTask(t) { return JSON.parse(JSON.stringify(t)); }
+function removeTombstone(id) {
+  state.tombstones = (state.tombstones || []).filter(function (x) { return x.id !== id; });
+}
+// tâche répétée cochée → l'occurrence suivante est créée immédiatement (catégorie déduite de la date)
+function nextOccurrence(t) {
+  var r = cleanRep(t.rep);
+  if (!r || !t.due) return null;
+  if (r.count !== null && r.count <= 1) return null; // dernière occurrence du cycle : rien à créer
+  var step = (r.mode === "daily") ? 1 : (r.mode === "ndays") ? r.every : (r.mode === "weekly") ? 7 : (r.mode === "2weeks") ? 14 : 0;
+  var nd = step ? addDaysISO(t.due, step) : addMonthsISO(t.due, 1);
+  var nrep = { mode: r.mode, every: r.every, count: (r.count !== null) ? r.count - 1 : null };
+  return addTask(t.title, t.note, catForDate(nd), nd, t.type, {
+    startT: t.startT, endT: t.endT, until: null, rep: nrep,
+    gEventId: t.gEventId, autoImport: t.autoImport, gSync: t.gSync
+  });
+}
 function completeTask(id) {
   var t = getTask(id);
   if (!t) return false;
+  var snap = snapshotTask(t);
+  var clone = nextOccurrence(t); // répétition : la prochaine occurrence existe déjà pour la suite
   t.cat = "done";
   t.doneAt = today();
   t.deferredFrom = null;
   save();
+  _undo = { kind: "complete", snap: snap, cloneId: clone ? clone.id : null };
+  showToast(clone ? "✅ Fait — prochaine occurrence le " + fmtDate(clone.due) : "✅ Tâche faite", { action: "Annuler", ttl: 5000 });
   return true;
 }
-function deferTask(id) {
+// Reporter : ouvre la feuille de report — la date change VRAIMENT (demain, +7 j, date au choix)
+function deferTask(id) { openDeferSheet(id); }
+function deferTo(id, iso) {
   var t = getTask(id);
-  if (!t) return false;
-  t.cat = "urgent";
-  t.deferredFrom = today();
+  if (!t || !iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  var from = t.due || today();
+  t.deferredFrom = from;
+  t.due = iso;
+  t.cat = catForDate(iso);
+  t.doneAt = null;
+  t.until = cleanUntil(iso, t.until); // un « jusqu'au » antérieur au nouveau début disparaît
   save();
+  closeDeferSheet();
+  renderAll();
+  showToast("⬅️ Reportée au " + fmtDate(iso));
+  // la tâche avait créé un retour agenda (pas une import) → l'événement suit le report
+  if (t.gEventId && !t.autoImport && String(t.gEventId).indexOf("_") < 0 && state.cfg && state.cfg.cid && state.cfg.refresh) taskToEvent(t.id);
   return true;
 }
 function reactivateTask(id) {
@@ -783,12 +963,41 @@ function deleteTask(id) {
     // la tâche avait créé un événement agenda → on le retire aussi (les tâches importées de l'agenda n'y touchent pas)
     if (t && t.gEventId && !t.autoImport) agendaDeleteEvent(t.gEventId, t.title);
     save();
+    _undo = { kind: "delete", snap: snapshotTask(t) };
+    showToast("🗑️ Tâche supprimée", { action: "Annuler", ttl: 5000 });
   }
   return n > 0;
 }
+// bouton « Annuler » du toast (5 s) : restaure le dernier ✓ ou 🗑️
+function undoLast() {
+  var u = _undo;
+  _undo = null;
+  if (!u) return;
+  if (u.kind === "complete") {
+    var t = getTask(u.snap.id);
+    if (t) { t.cat = u.snap.cat; t.doneAt = u.snap.doneAt; t.deferredFrom = u.snap.deferredFrom; }
+    if (u.cloneId && getTask(u.cloneId)) {
+      state.tasks = state.tasks.filter(function (x) { return x.id !== u.cloneId; });
+      removeTombstone(u.cloneId); // l'occurrence créée à la volée repart
+    }
+    save();
+    showToast("↩️ Tâche restaurée (pas marquée faite)");
+  } else if (u.kind === "delete") {
+    if (!getTask(u.snap.id)) state.tasks.unshift(u.snap);
+    removeTombstone(u.snap.id); // la suppression est annulée : la pierre tombale disparaît (sinon Drive la re-supprimerait)
+    save();
+    if (u.snap.gEventId && !u.snap.autoImport && String(u.snap.gEventId).indexOf("_") < 0 && state.cfg && state.cfg.cid && state.cfg.refresh) taskToEvent(u.snap.id); // l'événement est recréé au besoin (404 → recréation)
+    showToast("↩️ Tâche restaurée");
+  }
+  try { renderAll(); } catch (e) {}
+}
 function counts() {
-  var c = { urgent: 0, week: 0, later: 0, done: 0, lists: state.lists.length };
-  state.tasks.forEach(function (t) { if (c[t.cat] !== undefined) c[t.cat]++; });
+  var c = { today: 0, urgent: 0, week: 0, later: 0, done: 0, lists: state.lists.length };
+  var td = today();
+  state.tasks.forEach(function (t) {
+    if (c[t.cat] !== undefined) c[t.cat]++;
+    if (t.cat !== "done" && t.due && t.due <= td) c.today++; // retards + échéances du jour
+  });
   return c;
 }
 function onDelete(id) {
@@ -943,9 +1152,7 @@ function newFromTemplate(id) {
   return copy;
 }
 // copier une liste en texte (SMS, WhatsApp…) — les codes restent masqués
-function copyListText(listId) {
-  var l = getList(listId);
-  if (!l) return false;
+function buildListText(l) {
   var lines = ["📋 " + l.name];
   l.items.forEach(function (it) {
     var box = it.done ? "☒" : "☐";
@@ -954,7 +1161,23 @@ function copyListText(listId) {
     lines.push(box + " " + q + val);
   });
   if (l.items.length === 0) lines.push("(liste vide)");
-  copyText(lines.join("\n"), "📤 Liste copiée — colle-la dans un SMS, WhatsApp…");
+  return lines.join("\n");
+}
+// 📤 Partager : partage natif du téléphone si dispo, sinon copie dans le presse-papier
+function shareList(listId) {
+  var l = getList(listId);
+  if (!l) return false;
+  var txt = buildListText(l);
+  try {
+    if (navigator.share) { navigator.share({ title: l.name, text: txt }).catch(function () {}); return true; }
+  } catch (e) {}
+  copyText(txt, "📤 Liste copiée — colle-la dans un SMS, WhatsApp…");
+  return true;
+}
+function copyListText(listId) {
+  var l = getList(listId);
+  if (!l) return false;
+  copyText(buildListText(l), "📤 Liste copiée — colle-la dans un SMS, WhatsApp…");
   return true;
 }
 // codes masqués : révélation transitoire + copie sans révéler à l'écran
@@ -983,6 +1206,60 @@ function listProgress(l) {
   l.items.forEach(function (it) { if (it.done) done++; });
   return { done: done, total: l.items.length };
 }
+// progression TOTALE d'une branche : la liste + toutes ses sous-listes (récursif)
+function listProgressAgg(l) {
+  var agg = listProgress(l);
+  state.lists.filter(function (c) { return c.parent === l.id; }).forEach(function (c) {
+    var p = listProgressAgg(c);
+    agg.done += p.done;
+    agg.total += p.total;
+  });
+  return agg;
+}
+// 🙈 masquer les éléments déjà cochés (état mémorisé par liste)
+function toggleHideDone(listId) {
+  var l = getList(listId);
+  if (!l) return false;
+  l.hideDone = !(l.hideDone === true);
+  save();
+  renderAll();
+  return true;
+}
+// ✏️ modifier un élément (texte, quantité, code masqué)
+var editItemIds = null;
+function openItemModal(listId, itemId) {
+  var l = getList(listId);
+  if (!l) return;
+  var it = l.items.filter(function (x) { return x.id === itemId; })[0];
+  if (!it) return;
+  editItemIds = { listId: listId, itemId: itemId };
+  document.getElementById("iLabel").textContent = "Modifier l'élément";
+  document.getElementById("iText").value = it.text;
+  document.getElementById("iQty").value = it.qty || "";
+  document.getElementById("iSecret").checked = it.secret === true;
+  document.getElementById("itemModal").className = "modal";
+}
+function closeItemModal() {
+  document.getElementById("itemModal").className = "modal hidden";
+  editItemIds = null;
+}
+function saveItemModal() {
+  if (!editItemIds) return;
+  var l = getList(editItemIds.listId);
+  var it = l && l.items.filter(function (x) { return x.id === editItemIds.itemId; })[0];
+  if (!it) { closeItemModal(); return; }
+  var v = (document.getElementById("iText").value || "").trim();
+  if (!v) { showToast("⚠️ Le texte de l'élément ne peut pas être vide"); return; }
+  var secret = document.getElementById("iSecret").checked === true;
+  var q = parseInt((document.getElementById("iQty").value || ""), 10);
+  it.text = v;
+  it.qty = (!secret && !isNaN(q) && q > 0 && q < 1000) ? q : null; // un code masqué n'a jamais de quantité
+  it.secret = secret;
+  save();
+  closeItemModal();
+  renderAll();
+  showToast("✅ Élément modifié");
+}
 function onDeleteList(id) {
   var key = "L:" + id;
   if (armed[key]) { deleteList(id); }
@@ -1001,7 +1278,7 @@ function openList(id) {
 // ---------- Export / Import ----------
 function exportData() {
   return {
-    app: "taches-relances", version: 8, tasks: state.tasks, lists: state.lists,
+    app: "taches-relances", version: 10, tasks: state.tasks, lists: state.lists,
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     tombstones: state.tombstones || [],
     savedAt: Date.now()
@@ -1038,6 +1315,7 @@ function normalizeListIn(l) {
     createdAt: l.createdAt || today(),
     parent: (typeof l.parent === "string" && /^[\w-]{1,64}$/.test(l.parent)) ? l.parent : null,
     template: l.template === true,
+    hideDone: l.hideDone === true,
     updatedAt: (typeof l.updatedAt === "number" && l.updatedAt > 0) ? l.updatedAt : null,
     items: (Array.isArray(l.items) ? l.items : []).filter(function (it) { return it && typeof it.text === "string"; }).map(function (it) {
       return {
@@ -1148,7 +1426,11 @@ function driveMergeOnStart() {
       showToast("☁️ Récupéré depuis Drive : " + added + " élément(s) absent(s) de cet appareil");
     }
     return added;
-  }).catch(function () { driveMergedOk = false; return 0; });
+  }).catch(function (e) {
+    driveMergedOk = false;
+    setSyncError("drive", e); // Drive injoignable / jeton refusé : la pastille le dit
+    return 0;
+  });
 }
 function doExport() {
   try {
@@ -1280,6 +1562,7 @@ function agendaRefresh(silent) {
     return agendaFetchAll(url, { headers: { "Authorization": "Bearer " + at } });
   }).then(function (items) {
     state.agendaCache = { fetchedAt: Date.now(), events: parseEvents({ items: items }) };
+    clearSyncError("agenda"); // synchro agenda réussie : la pastille redevient verte si elle était orange
     var nImp = 0, sync = null;
     if (state.autoAgenda) {
       nImp = autoImportAll();
@@ -1296,7 +1579,8 @@ function agendaRefresh(silent) {
       showToast(msg);
     }
     return true;
-  }).catch(function () {
+  }).catch(function (e) {
+    setSyncError("agenda", e); // pastille : 🟠 échec réseau/quota, 🔴 jeton refusé (invalid_grant)
     if (!silent) showToast("⚠️ Agenda indisponible — vérifie la configuration");
     return false;
   });
@@ -1497,13 +1781,15 @@ function driveBackupNow(silent) {
       });
     }).then(function (res) {
       state.driveSyncedAt = Date.now();
+      clearSyncError("drive"); // sauvegarde Drive réussie : pastille réparée
       persist();
       if (!silent) showToast("☁️ Sauvegardé sur Drive — « " + DRIVE_FILE_NAME + " » dans " + folderName + " (" + res + ")");
       return true;
     });
   };
   // jamais d'écrasement Drive sans fusion préalable réussie (sinon un appareil à jour vide écraserait tout)
-  if (driveMergedOk) return doSend().catch(function () {
+  if (driveMergedOk) return doSend().catch(function (e) {
+    setSyncError("drive", e);
     if (!silent) showToast("⚠️ Sauvegarde Drive impossible — vérifie la configuration");
     return false;
   });
@@ -1512,7 +1798,8 @@ function driveBackupNow(silent) {
       if (!silent) showToast("⚠️ Fusion Drive impossible — sauvegarde annulée, rien n'a été écrasé");
       return false;
     }
-    return doSend().catch(function () {
+    return doSend().catch(function (e) {
+      setSyncError("drive", e);
       if (!silent) showToast("⚠️ Sauvegarde Drive impossible — vérifie la configuration");
       return false;
     });
@@ -1667,7 +1954,10 @@ function importEventAsTask(ev, silent) {
   if (state.importedEvents[ev.id]) return null;
   // anti-doublon : une tâche de l'app ayant déjà cet événement (ou l'événement récurrent d'origine) → jamais de 2e tâche
   var base = String(ev.id).split("_")[0];
-  var owned = state.tasks.some(function (t) { return t.gEventId && (t.gEventId === ev.id || t.gEventId === base); });
+  var owned = state.tasks.some(function (t) {
+    if (!t.gEventId) return false;
+    return t.gEventId === ev.id || t.gEventId === base || String(t.gEventId).split("_")[0] === base; // instances : la base suffit
+  });
   if (owned) {
     state.importedEvents[ev.id] = { taskId: null, title: ev.title, day: ev.day, at: Date.now() };
     save();
@@ -1831,8 +2121,8 @@ function renderTabs() {
   var c = counts();
   var html = "";
   TABS.forEach(function (k) {
-    html += '<div class="tab ' + (tab === k ? "active " + k : "") + '" onclick="setTab(\'' + k + '\')">'
-      + CAT_LABELS[k] + '<span class="n">' + c[k] + "</span></div>";
+    html += '<button class="tab ' + (tab === k ? "active " + k : "") + '" role="tab" aria-selected="' + (tab === k ? "true" : "false") + '" onclick="setTab(\'' + k + '\')">'
+      + CAT_LABELS[k] + '<span class="n">' + c[k] + "</span></button>";
   });
   document.getElementById("tabbar").innerHTML = html;
 }
@@ -1866,6 +2156,38 @@ function taskHtml(t) {
     + '<button' + (armed[t.id] ? ' class="armed"' : "") + ' title="Supprimer" onclick="onDelete(\'' + t.id + "')\">" + (armed[t.id] ? "Confirmer ?" : "🗑️") + "</button>"
     + "</div></div>";
 }
+// écran ⭐ Aujourd'hui : retards + événements du jour + tâches du jour, tout au même endroit
+function todayHtml() {
+  var td = today();
+  var late = state.tasks.filter(function (t) { return t.cat !== "done" && t.due && t.due < td; }).sort(cmpTasks);
+  var now = state.tasks.filter(function (t) { return t.cat !== "done" && t.due === td; }).sort(cmpTasks);
+  var evs = (state.agendaCache && state.agendaCache.events) || [];
+  var evToday = evs.filter(function (e) { return e.day === td || (e.until && e.day <= td && e.until >= td); });
+  var h = '<div class="dayh today"><span class="day-tag">AUJOURD\'HUI</span> ' + dayLongLabel(td) + "</div>";
+  if (late.length > 0) {
+    h += '<div class="tsec">⚠️ En retard (' + late.length + ")</div>";
+    late.forEach(function (t) { h += taskHtml(t); });
+  }
+  if (evToday.length > 0) {
+    h += '<div class="tsec">📅 Événements du jour (' + evToday.length + ")</div>";
+    evToday.forEach(function (e) {
+      var time = e.allDay ? "journée" : (e.startT || "—");
+      h += '<div class="ev"><div class="ev-time">' + time + '</div><div class="ev-b"><div class="title">'
+        + (e.color === "11" ? "🔴 " : "") + esc(stripEvTitle(e.title)) + "</div>"
+        + ((e.until && e.until !== e.day) ? '<div class="meta">jusqu\'au ' + fmtDate(e.until) + "</div>" : "")
+        + "</div></div>";
+    });
+  }
+  if (now.length > 0) {
+    h += '<div class="tsec">📋 À faire aujourd\'hui (' + now.length + ")</div>";
+    now.forEach(function (t) { h += taskHtml(t); });
+  }
+  if (late.length === 0 && now.length === 0 && evToday.length === 0) {
+    h += '<div class="empty">Rien de prévu aujourd\'hui — profite 😎</div>';
+  }
+  h += '<div class="tsec-hint">⭐ Retards, événements et tâches du jour. Les tâches sans échéance restent dans leurs onglets 🔴🟠🟢.</div>';
+  return h;
+}
 function renderTasksTab() {
   promoteOverdue();
   var el = document.getElementById("list");
@@ -1878,6 +2200,11 @@ function renderTasksTab() {
     var h = '<div class="empty">🔎 ' + res.length + " résultat(s) pour « " + esc(searchQ) + " »</div>";
     res.forEach(function (t) { h += taskHtml(t); });
     el.innerHTML = h;
+    renderDriveCard();
+    return;
+  }
+  if (tab === "today") { // écran Aujourd'hui : tout le jour en un coup d'œil
+    el.innerHTML = todayHtml();
     renderDriveCard();
     return;
   }
@@ -1948,10 +2275,10 @@ function renderDriveCard() {
     + "</div>";
 }
 function listCardHtml(l, isSub) {
-  var pr = listProgress(l);
-  var pct = pr.total > 0 ? Math.round(100 * pr.done / pr.total) : 0;
   var kids = state.lists.filter(function (c) { return c.parent === l.id; });
-  var subNote = (!isSub && kids.length > 0) ? '<div class="subn">📁 ' + kids.length + " sous-liste(s)</div>" : "";
+  var pr = (kids.length > 0) ? listProgressAgg(l) : listProgress(l); // progression TOTALE de la branche (avec sous-listes)
+  var pct = pr.total > 0 ? Math.round(100 * pr.done / pr.total) : 0;
+  var subNote = (!isSub && kids.length > 0) ? '<div class="subn">📁 ' + kids.length + " sous-liste(s) · total " + pr.done + "/" + pr.total + "</div>" : "";
   var tplBadge = (l.template === true) ? '<span class="tpl">📋 modèle</span>' : "";
   var tplBtn = (l.template === true) ? '<button title="Créer une liste neuve depuis ce modèle (cochages à zéro)" onclick="newFromTemplate(\'' + l.id + "')\">➕ Nouvelle depuis</button>" : "";
   return '<div class="listcard' + (isSub ? " sub" : "") + '">'
@@ -1996,16 +2323,23 @@ function renderListDetail() {
   if (!l) { showView("tasks"); return; }
   var pr = listProgress(l);
   var pct = pr.total > 0 ? Math.round(100 * pr.done / pr.total) : 0;
+  var hasKids = state.lists.some(function (c) { return c.parent === l.id; });
+  var agg = hasKids ? listProgressAgg(l) : null;
   var html = '<div class="ld-head">'
     + '<button class="rowbtn" onclick="closeList()">← Listes</button>'
-    + '<div class="t"><h2>' + esc(l.name) + '</h2><span class="cnt">' + pr.done + "/" + pr.total + " ✓</span></div>"
+    + '<div class="t"><h2>' + esc(l.name) + '</h2><span class="cnt">' + pr.done + "/" + pr.total + " ✓" + (agg ? " · total " + agg.done + "/" + agg.total : "") + "</span></div>"
     + '<div class="bar" style="width:70px"><div style="width:' + pct + '%"></div></div>'
     + '<button class="rowbtn" title="Renommer" onclick="openListModal(\'' + l.id + "')\">✏️</button>"
     + "</div>";
+  var shown = (l.hideDone === true) ? l.items.filter(function (x) { return !x.done; }) : l.items;
+  var nDone = l.items.length - shown.length;
   if (l.items.length === 0) {
     html += '<div class="empty">Liste vide — ajoute ton premier élément ci-dessous.</div>';
+  } else if (shown.length === 0) {
+    html += '<div class="empty">🙈 Tous les éléments sont cochés — ' + nDone + " masqué(s).</div>";
   }
-  l.items.forEach(function (it, idx) {
+  shown.forEach(function (it) {
+    var idx = l.items.indexOf(it);
     var masked = it.secret && !revealed[it.id];
     var txtHtml = it.qty ? '<span class="qty">' + it.qty + " × </span>" : "";
     if (masked) txtHtml += '<span class="masked">••••••</span>';
@@ -2017,6 +2351,7 @@ function renderListDetail() {
         ? '<button class="min" title="' + (masked ? "Révéler" : "Masquer") + '" onclick="toggleReveal(\'' + it.id + "')\">" + (masked ? "👁" : "🙈") + "</button>"
           + '<button class="min" title="Copier le code (sans le montrer à l\'écran)" onclick="copyItemSecret(\'' + l.id + "','" + it.id + '\')">📋</button>'
         : "")
+      + '<button class="min" title="Modifier l\'élément" onclick="openItemModal(\'' + l.id + "','" + it.id + '\')">✏️</button>'
       + '<button class="min" title="Monter"' + (idx === 0 ? " disabled" : "") + ' onclick="moveItem(\'' + l.id + "','" + it.id + '\',-1);renderAll()">▲</button>'
       + '<button class="min" title="Descendre"' + (idx === l.items.length - 1 ? " disabled" : "") + ' onclick="moveItem(\'' + l.id + "','" + it.id + '\',1);renderAll()">▼</button>'
       + '<button class="del" onclick="deleteItem(\'' + l.id + "','" + it.id + "');renderAll()\">✕</button>"
@@ -2038,7 +2373,11 @@ function renderListDetail() {
   }
   html += '<div class="ld-foot">'
     + '<button onclick="resetChecks(\'' + l.id + "');renderAll()\">🔁 Tout décocher</button>"
-    + '<button onclick="copyListText(\'' + l.id + "')\">📤 Copier en texte</button>"
+    + (l.hideDone === true
+      ? '<button onclick="toggleHideDone(\'' + l.id + '\')">👁 Afficher les ' + nDone + " coché(s)</button>"
+      : '<button onclick="toggleHideDone(\'' + l.id + '\')">🙈 Masquer cochés</button>')
+    + '<button onclick="shareList(\'' + l.id + '\')">📤 Partager</button>'
+    + '<button onclick="copyListText(\'' + l.id + "')\">📋 Copier en texte</button>"
     + '<button onclick="duplicateList(\'' + l.id + "');renderAll()\">📋 Dupliquer</button>"
     + '<button onclick="toggleTemplate(\'' + l.id + "')\">" + (l.template === true ? "📌 Modèle : ✅ ON" : "📌 Garder comme modèle") + "</button>"
     + '<button onclick="openListModal(null,\'' + l.id + "')\">➕ Sous-liste</button>"
@@ -2051,11 +2390,15 @@ function addItemFromInput() {
   if (!inp || !currentListId) return;
   var v = (inp.value || "").trim();
   if (!v) return;
-  addItem(currentListId, v, secretNext);
+  // collage en lot : une ligne = un élément (pratique pour coller une liste entière)
+  var lines = v.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  lines.forEach(function (ln) { addItem(currentListId, ln, secretNext); });
+  var n = lines.length;
   secretNext = false;
   renderAll();
   var el = document.getElementById("itemInput");
   if (el) el.focus(); // le rendu remplace le DOM : on rend le focus au champ, le clavier reste ouvert
+  if (n > 1) showToast("➕ " + n + " éléments ajoutés (collage en lot)");
 }
 function closeList() {
   currentListId = null;
@@ -2099,7 +2442,7 @@ function renderAgenda() {
     + '<button onclick="agendaDisconnect()">Déconnecter</button>'
     + "</div>"
     + '<div class="syncline">Dernière synchro agenda : ' + fmtAgo(state.agendaCache && state.agendaCache.fetchedAt) + "</div>"
-    + '<div class="hint" style="font-size:12px;color:#94a3b8;padding:0 2px 6px">'
+    + '<div class="hint" style="font-size:12px;color:#b3c0d1;padding:0 2px 6px">'
     + (auto
       ? "✅ Import auto <b>activé</b> : chaque actualisation transforme les nouveaux événements des " + win + " prochains jours en tâches, <b>et met à jour les tâches si l'événement bouge</b> (sauf celles que tu modifies toi-même)."
       : "📥 Import auto <b>désactivé</b> : active-le pour que chaque événement de l'agenda devienne une tâche tout seul et se mette à jour tout seul, ou utilise « Tout importer en tâches ».")
@@ -2160,14 +2503,180 @@ function setTab(k) {
 }
 function onFab() {
   if (tab === "lists") openListModal();
-  else openModal();
+  else openQuickAdd(); // saisie rapide ; « ⚙️ Plus d'options » ouvre la modale complète
 }
 function renderAll() {
   renderTabs();
   renderWarnCard();
+  renderSyncPill(); // pastille 🟢🟠🔴 dans l'en-tête
+  updateBadge(); // badge de l'icône = retards + aujourd'hui
   if (view === "tasks") renderTasksTab();
   else if (view === "list") renderListDetail();
   else renderAgenda();
+}
+
+// ---------- Saisie rapide (une ligne + puces de date) ----------
+var quickDue = "today";
+var quickType = "perso";
+function openQuickAdd() {
+  var inp = document.getElementById("qTitle");
+  if (inp) inp.value = "";
+  quickPick("today");
+  quickPickType("perso");
+  var chk = document.getElementById("qAgenda");
+  if (chk) chk.checked = (state.cfg && state.cfg.quickAgenda) === true; // le choix agenda est mémorisé
+  var dp = document.getElementById("qDate");
+  if (dp) dp.value = "";
+  document.getElementById("quickModal").className = "modal";
+  try { if (inp && inp.focus) inp.focus(); } catch (e) {}
+}
+function closeQuickAdd() {
+  document.getElementById("quickModal").className = "modal hidden";
+}
+function quickPick(k) {
+  quickDue = k;
+  ["today", "tomorrow", "week", "none"].forEach(function (c) {
+    var el = document.getElementById("q-" + c);
+    if (el) el.className = "chip" + (c === k ? " on" : "");
+  });
+}
+function quickDateChange() {
+  var v = (document.getElementById("qDate").value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    quickDue = "date"; // date manuelle choisie : elle prime sur les puces
+    ["today", "tomorrow", "week", "none"].forEach(function (c) {
+      var el = document.getElementById("q-" + c);
+      if (el) el.className = "chip";
+    });
+  }
+}
+function quickDueIso() {
+  if (quickDue === "date") return (document.getElementById("qDate").value || "").trim() || null;
+  if (quickDue === "today") return today();
+  if (quickDue === "tomorrow") return addDaysISO(today(), 1);
+  if (quickDue === "week") return addDaysISO(today(), 7);
+  return null;
+}
+function quickPickType(k) {
+  quickType = k;
+  ["pro", "perso"].forEach(function (c) {
+    var el = document.getElementById("qt-" + c);
+    if (el) el.className = "chip" + (c === k ? " on" : "");
+  });
+}
+function quickSave() {
+  var title = (document.getElementById("qTitle").value || "").trim();
+  if (!title) { showToast("⚠️ Donne un titre à la tâche"); return; }
+  var due = quickDueIso();
+  var cat = due ? catForDate(due) : ((CATS.indexOf(tab) >= 0) ? tab : "urgent"); // catégorie déduite de la date
+  var chk = document.getElementById("qAgenda");
+  var wantAgenda = !!(chk && chk.checked && due);
+  if (chk) state.cfg = Object.assign({}, state.cfg || {}, { quickAgenda: chk.checked === true }); // choix mémorisé
+  var t = addTask(title, "", cat, due, quickType === "pro" ? "pro" : "perso", {});
+  closeQuickAdd();
+  renderAll();
+  if (wantAgenda) {
+    if (state.cfg && state.cfg.cid && state.cfg.refresh) { showToast("💾 Ajoutée — 📅 synchro agenda en cours…"); taskToEvent(t.id); }
+    else showToast("✅ Tâche ajoutée (agenda non connecté)");
+  } else {
+    showToast("✅ Tâche ajoutée");
+  }
+}
+// « ⚙️ Plus d'options » : la saisie rapide bascule vers la modale complète, titre et date conservés
+function quickMore() {
+  var title = (document.getElementById("qTitle").value || "").trim();
+  var due = quickDueIso();
+  openModal();
+  document.getElementById("mTitle").value = title;
+  if (due) document.getElementById("mDue").value = due;
+  closeQuickAdd();
+}
+
+// ---------- Reporter (feuille : demain, +7 j, date au choix) ----------
+var deferId = null;
+function openDeferSheet(id) {
+  if (!getTask(id)) return;
+  deferId = id;
+  var inp = document.getElementById("dfrDate");
+  if (inp) inp.value = addDaysISO(today(), 1);
+  document.getElementById("deferModal").className = "modal";
+}
+function closeDeferSheet() {
+  document.getElementById("deferModal").className = "modal hidden";
+  deferId = null;
+}
+function deferBy(n) {
+  if (!deferId) return;
+  var t = getTask(deferId);
+  if (!t) { closeDeferSheet(); return; }
+  deferTo(t.id, addDaysISO(t.due || today(), n));
+}
+function deferPicked() {
+  var v = (document.getElementById("dfrDate").value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { showToast("⚠️ Choisis une date de report"); return; }
+  if (deferId) deferTo(deferId, v);
+}
+
+// ---------- Pastille de synchro (en-tête : 🟢 OK / 🟠 partiel ou échec / 🔴 reconnexion nécessaire) ----------
+function setSyncError(scope, err) {
+  var msg = String((err && err.message) || err || "");
+  var kind = /invalid_grant|expired|revoked/i.test(msg) ? "auth" : "err";
+  state.syncError = { scope: scope, kind: kind, at: Date.now() };
+  persist();
+  renderSyncPill();
+}
+function clearSyncError(scope) {
+  if (state.syncError && state.syncError.scope === scope) {
+    state.syncError = null;
+    persist();
+    renderSyncPill();
+  }
+}
+function renderSyncPill() {
+  var el = document.getElementById("syncPill");
+  if (!el) return;
+  var cfg = state.cfg || {};
+  var hasAgenda = !!(cfg.cid && cfg.refresh);
+  var hasDrive = !!(cfg.dCid && cfg.dRefresh);
+  if (state.syncError) {
+    el.textContent = (state.syncError.kind === "auth") ? "🔴" : "🟠";
+    el.title = (state.syncError.kind === "auth")
+      ? "Reconnexion Google nécessaire (jeton refusé) — " + state.syncError.scope
+      : "Dernière synchro " + state.syncError.scope + " en échec — vérifie la connexion";
+  } else if (!hasAgenda && !hasDrive) {
+    el.textContent = "🟠";
+    el.title = "Google non connecté (agenda + Drive)";
+  } else if (!hasAgenda || !hasDrive) {
+    el.textContent = "🟠";
+    el.title = "Google partiellement connecté (" + (hasDrive ? "Drive seul" : "agenda seul") + ")";
+  } else {
+    el.textContent = "🟢";
+    el.title = "Synchro Google active — dernière sauvegarde Drive : " + fmtAgo(state.driveSyncedAt);
+  }
+}
+
+// ---------- Thème clair ☀️ / sombre 🌙 ----------
+function applyTheme() {
+  var light = !!(state.cfg && state.cfg.light);
+  if (typeof document !== "undefined" && document.documentElement) {
+    try { document.documentElement.className = light ? "light" : ""; } catch (e) {}
+  }
+  var b = document.getElementById("themeBtn");
+  if (b) b.textContent = light ? "☀️" : "🌙";
+}
+function toggleTheme() {
+  state.cfg = Object.assign({}, state.cfg || {}, { light: !(state.cfg && state.cfg.light) });
+  persist();
+  applyTheme();
+}
+
+// ---------- Badge de l'icône (retards + aujourd'hui) ----------
+function updateBadge() {
+  try {
+    var n = counts().today || 0;
+    if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n);
+    else if (navigator.clearAppBadge) navigator.clearAppBadge();
+  } catch (e) {}
 }
 
 // ---------- Modale tâche ----------
@@ -2218,7 +2727,7 @@ function openModal(id) {
   document.getElementById("mRepEvery").value = (t && t.rep && t.rep.every) ? t.rep.every : "";
   document.getElementById("mRepCount").value = (t && t.rep && t.rep.count) ? t.rep.count : "";
   onRepChange();
-  var defaultCat = t ? t.cat : (tab !== "done" && tab !== "lists" ? tab : "urgent");
+  var defaultCat = t ? t.cat : ((tab === "urgent" || tab === "week" || tab === "later") ? tab : "urgent");
   if (defaultCat === "done" || defaultCat === "lists") defaultCat = "urgent";
   pickCat(defaultCat);
   pickType(t ? (t.type === "pro" ? "pro" : "perso") : "perso");
@@ -2310,18 +2819,25 @@ function saveListModal() {
   renderAll();
 }
 
-// ---------- Toast ----------
+// ---------- Toast (avec bouton « Annuler » quand une action est proposée) ----------
 var toastTimer = null;
-function showToast(msg) {
+function showToast(msg, opts) {
+  opts = opts || {};
   var el = document.getElementById("toast");
-  el.textContent = msg;
-  el.className = "show";
+  if (opts.action) {
+    el.innerHTML = esc(msg) + ' <button onclick="undoLast()">' + esc(opts.action) + "</button>";
+    el.className = "show act"; // pointer-events actifs : le bouton doit être cliquable
+  } else {
+    el.textContent = msg;
+    el.className = "show";
+  }
   if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(function () { el.className = ""; }, 2600);
+  toastTimer = setTimeout(function () { el.className = ""; }, opts.ttl || 2600);
 }
 
 // ---------- Démarrage ----------
 document.getElementById("vBadge").textContent = APP_VERSION;
+applyTheme(); // ☀️/🌙 mémorisé dans la config
 renderCats();
 showView("tasks");
 // Au lancement : 1) fusion avec la sauvegarde Drive (récupère ce qui manque sur cet appareil)
@@ -2332,6 +2848,17 @@ driveMergeOnStart().then(function () {
 });
 // Retour au premier plan de l'app (PWA) : on resynchronise
 if (typeof document !== "undefined" && document.addEventListener) {
+  // Échap = fermer la feuille ouverte (n'importe laquelle)
+  document.addEventListener("keydown", function (e) {
+    if (e && e.key === "Escape") {
+      try { closeModal(); } catch (e2) {}
+      try { closeListModal(); } catch (e2) {}
+      try { closeEvModal(); } catch (e2) {}
+      try { closeQuickAdd(); } catch (e2) {}
+      try { closeDeferSheet(); } catch (e2) {}
+      try { closeItemModal(); } catch (e2) {}
+    }
+  });
   document.addEventListener("visibilitychange", function () {
     if (typeof document.hidden !== "undefined" && document.hidden) {
       driveBackupNow(true); // arrière-plan : sauvegarde Drive immédiate (le debounce de 30 s serait perdu à la fermeture)
@@ -2352,8 +2879,13 @@ if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.p
   }).catch(function () {});
 }
 if ('serviceWorker' in navigator) {
+  var _hadSW = !!(navigator.serviceWorker.controller);
   addEventListener('load', function () {
     navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (_hadSW) showToast("🔄 Nouvelle version installée — recharge la page pour l'obtenir");
+    _hadSW = true;
   });
 }
 </script>
