@@ -1,0 +1,3154 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#020617">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Mes tâches</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #020617; color: #e2e8f0;
+    padding-bottom: 96px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(2, 6, 23, 0.92); backdrop-filter: blur(6px);
+    padding: 14px 16px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #1e293b;
+  }
+  header .left { display: flex; align-items: baseline; gap: 8px; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  .badge { font-size: 12px; color: #b3c0d1; font-weight: 400; }
+  .agbtn {
+    background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 6px 10px; font-size: 16px; cursor: pointer;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  .hidden { display: none !important; }
+  #tabbar {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
+    padding: 10px 10px 6px; max-width: 560px; margin: 0 auto;
+  }
+  .tab {
+    border: 1px solid #1e293b; background: #0f172a; color: #cbd5e1;
+    border-radius: 12px; padding: 7px 2px; font-size: 11px; font-weight: 600;
+    cursor: pointer; text-align: center; line-height: 1.4;
+    font-family: inherit; appearance: none; -webkit-appearance: none; width: 100%;
+  }
+  .tab .n { display: block; font-size: 15px; font-weight: 800; }
+  .tab.active.tasks { border-color: #38bdf8; color: #38bdf8; background: rgba(56,189,248,0.08); }
+  .tab.active.urgent { border-color: #fb7185; color: #fb7185; background: rgba(251,113,133,0.08); }
+  .tab.active.week   { border-color: #fbbf24; color: #fbbf24; background: rgba(251,191,36,0.08); }
+  .tab.active.later  { border-color: #34d399; color: #34d399; background: rgba(52,211,153,0.08); }
+  .tab.active.lists  { border-color: #a78bfa; color: #a78bfa; background: rgba(167,139,250,0.08); }
+  .tab.active.done   { border-color: #b3c0d1; color: #e2e8f0; background: rgba(148,163,184,0.08); }
+  #list, #agBody, #listDetail { padding: 8px 12px; max-width: 560px; margin: 0 auto; }
+  .task {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 14px;
+    padding: 12px; margin-bottom: 10px; display: flex; gap: 10px; align-items: flex-start;
+  }
+  .task.urgent { border-left: 4px solid #fb7185; }
+  .task.week   { border-left: 4px solid #fbbf24; }
+  .task.later  { border-left: 4px solid #34d399; }
+  .task.done   { border-left: 4px solid #475569; opacity: 0.75; }
+  .task .body { flex: 1; min-width: 0; }
+  .task .title { font-size: 15px; font-weight: 600; word-wrap: break-word; }
+  .task.done .title { text-decoration: line-through; color: #b3c0d1; }
+  .task .note { font-size: 13px; color: #b3c0d1; margin-top: 2px; white-space: pre-wrap; word-wrap: break-word; }
+  .task .meta { font-size: 11px; color: var(--muted); margin-top: 5px; } /* v13 : #64748b ≈ 3,7:1 sur sombre — le texte secondaire le plus lu */
+  .task .meta .rep { color: #fbbf24; }
+  .task .meta .late { color: #fb7185; font-weight: 700; }
+  .task .meta .due-today { color: #fbbf24; font-weight: 700; }
+  .chk {
+    flex: 0 0 30px; height: 30px; border-radius: 50%;
+    border: 2px solid #475569; background: transparent; color: #020617;
+    font-size: 15px; font-weight: 800; cursor: pointer; line-height: 1;
+  }
+  .chk:active { background: #34d399; border-color: #34d399; }
+  .acts { display: flex; flex-direction: column; gap: 6px; }
+  .acts button, .rowbtn {
+    border: 1px solid #1e293b; background: #020617; color: #cbd5e1;
+    border-radius: 9px; padding: 4px 8px; font-size: 13px; cursor: pointer;
+  }
+  .acts button.armed, .rowbtn.armed { background: #7f1d1d; border-color: #fb7185; color: #fecdd3; font-weight: 700; }
+  .empty { text-align: center; color: #64748b; font-size: 14px; padding: 40px 16px; }
+  /* Listes */
+  .listcard {
+    background: #0f172a; border: 1px solid #1e293b; border-left: 4px solid #a78bfa;
+    border-radius: 14px; padding: 12px; margin-bottom: 10px;
+  }
+  .listcard .name { font-size: 15px; font-weight: 700; cursor: pointer; }
+  .listcard .row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .bar { flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; }
+  .bar > div { height: 100%; background: #34d399; border-radius: 4px; transition: width 0.3s; }
+  .listcard .cnt { font-size: 12px; color: #b3c0d1; white-space: nowrap; }
+  .listcard .acts { flex-direction: row; margin-top: 8px; flex-wrap: wrap; } /* v12 : « ➕ Nouvelle depuis » ne fait plus déborder la ligne */
+  .item {
+    display: flex; align-items: center; gap: 10px;
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 12px;
+    padding: 10px 12px; margin-bottom: 8px;
+  }
+  .item .txt { flex: 1; font-size: 14px; word-wrap: break-word; }
+  .item .txt.done { text-decoration: line-through; color: #64748b; }
+  .item .chk { flex: 0 0 26px; height: 26px; font-size: 13px; }
+  .item .chk.on { background: #34d399; border-color: #34d399; }
+  .item .del { background: transparent; border: none; color: #64748b; font-size: 15px; cursor: pointer; padding: 4px; }
+  .addrow { display: flex; gap: 8px; margin-top: 10px; }
+  .addrow input, .addrow textarea {
+    flex: 1; background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 14px; font-family: inherit;
+  }
+  .addrow textarea { resize: vertical; min-height: 44px; } /* v12 : collage en lot (une ligne = un élément) */
+  .addrow button {
+    background: #a78bfa; border: none; color: #020617; font-weight: 700;
+    border-radius: 10px; padding: 10px 14px; font-size: 14px; cursor: pointer;
+  }
+  .addrow .sectgl {
+    background: #0f172a; border: 1px dashed #fbbf24; color: #b3c0d1; padding: 10px 12px;
+  }
+  .addrow .sectgl.on { background: #fbbf24; color: #020617; border-style: solid; }
+  .item .min { background: transparent; border: none; color: #64748b; cursor: pointer; padding: 2px 3px; font-size: 13px; }
+  .item .min:disabled { opacity: 0.25; cursor: default; }
+  .item .qty { color: #38bdf8; font-weight: 700; }
+  .item .masked { color: #b3c0d1; letter-spacing: 2px; }
+  .item.secret { border-left: 3px dashed #fbbf24; }
+  .listcard .tpl { font-size: 10px; color: #fbbf24; border: 1px solid #fbbf24; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+  .searchrow { display: flex; gap: 8px; padding: 0 12px 8px; max-width: 560px; margin: 0 auto; }
+  .searchrow input {
+    flex: 1; background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 9px 12px; font-size: 14px; font-family: inherit;
+  }
+  .searchrow button { background: #1e293b; border: none; color: #b3c0d1; border-radius: 10px; padding: 0 12px; cursor: pointer; }
+  .ld-head { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
+  .ld-head .t { flex: 1; min-width: 0; }
+  .ld-head h2 { font-size: 17px; word-wrap: break-word; }
+  .ld-head .cnt { font-size: 12px; color: #b3c0d1; }
+  .ld-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .ld-foot .rowbtn, .ld-foot button {
+    border: 1px solid #334155; background: #0f172a; color: #cbd5e1;
+    border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  /* Agenda */
+  .ag-head { display: flex; align-items: center; gap: 12px; padding: 14px 12px 4px; max-width: 560px; margin: 0 auto; }
+  .ag-head h2 { font-size: 18px; }
+  .day-h {
+    font-size: 13px; font-weight: 700; color: #38bdf8; margin: 16px 0 8px;
+    display: flex; align-items: baseline; gap: 8px;
+    border-bottom: 1px solid #1e293b; padding-bottom: 6px;
+  }
+  .day-h small { color: #64748b; font-weight: 400; }
+  .day-h .day-count { margin-left: auto; color: #64748b; font-weight: 500; font-size: 11px; }
+  .day-h.today { color: #34d399; border-bottom-color: #14532d; }
+  .day-h.today .day-tag { background: #34d399; color: #020617; border-radius: 6px; padding: 1px 7px; font-size: 11px; }
+  .ev-time { flex: 0 0 46px; font-size: 12px; font-weight: 700; color: #38bdf8; text-align: right; }
+  .ev.allday .ev-time { color: #64748b; font-weight: 500; font-size: 11px; }
+  .ev .acts { display: flex; gap: 6px; }
+  .ev {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 12px;
+    padding: 11px 12px; margin-bottom: 8px; display: flex; gap: 10px; align-items: center;
+  }
+  .ev .ev-b { flex: 1; min-width: 0; }
+  .ev .title { font-size: 14px; font-weight: 600; word-wrap: break-word; }
+  .ev .meta { font-size: 12px; color: #b3c0d1; margin-top: 2px; }
+  .ev .chk { flex: 0 0 30px; height: 30px; background: #38bdf8; border-color: #38bdf8; color: #020617; }
+  .ag-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
+  .ag-actions button, .cfg-card button {
+    border: 1px solid #334155; background: #0f172a; color: #e2e8f0;
+    border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .cfg-card {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 14px;
+    padding: 14px; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .cfg-card .h { font-size: 14px; font-weight: 700; }
+  .cfg-card .hint { font-size: 12px; color: #b3c0d1; line-height: 1.5; }
+  .cfg-card input {
+    background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 14px; width: 100%; font-family: inherit;
+  }
+  .cfg-card .hint code { color: #38bdf8; word-break: break-all; }
+  .data-card input {
+    background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 14px; width: 100%;
+    font-family: inherit; margin-bottom: 8px;
+  }
+  .data-card .hint { font-size: 12px; color: #b3c0d1; line-height: 1.5; margin-bottom: 8px; }
+  .data-card .hint code { color: #38bdf8; word-break: break-all; }
+  .listcard.sub { margin-left: 22px; border-left-style: dashed; }
+  .listcard.sub .name { font-size: 14px; }
+  .listcard .subn { font-size: 11px; color: #a78bfa; margin-top: 2px; }
+  .subchips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .subchips button {
+    border: 1px dashed #a78bfa; background: #020617; color: #c4b5fd;
+    border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .task .tp { margin-right: 3px; }
+  .data-card {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 14px;
+    padding: 12px; margin: 6px 12px 16px; max-width: 560px; margin-left: auto; margin-right: auto;
+  }
+  .data-card .lbl { font-size: 13px; color: #b3c0d1; margin-bottom: 8px; }
+  .data-card .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .data-card button {
+    border: 1px solid #334155; background: #020617; color: #e2e8f0;
+    border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  #fab {
+    position: fixed; right: 18px; bottom: 22px; z-index: 30;
+    width: 58px; height: 58px; border-radius: 50%;
+    background: #38bdf8; color: #020617; border: none;
+    font-size: 30px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 18px rgba(56,189,248,0.4);
+  }
+  .modal {
+    position: fixed; inset: 0; z-index: 40; background: rgba(2,6,23,0.7);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .sheet {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 18px 18px 0 0;
+    width: 100%; max-width: 560px; padding: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 10px;
+    max-height: 92dvh; overflow-y: auto; /* petit écran / clavier ouvert : la feuille reste lisible et défilable */
+  }
+  .sheet .st { font-size: 16px; font-weight: 700; }
+  .sheet input[type=text], .sheet input[type=date], .sheet textarea {
+    background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 15px; width: 100%;
+    font-family: inherit; color-scheme: dark;
+  }
+  .sheet textarea { min-height: 64px; resize: vertical; }
+  .sheet .flabel { font-size: 12px; color: #b3c0d1; margin-top: 2px; }
+  .cat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .cat-row label {
+    display: block; text-align: center; font-size: 12px; font-weight: 600;
+    border: 1px solid #334155; border-radius: 10px; padding: 8px 4px; cursor: pointer; color: #cbd5e1;
+  }
+  .cat-row input { display: none; }
+  .cat-row label.on { border-color: #38bdf8; background: rgba(56,189,248,0.1); }
+  .sheet .row { display: flex; gap: 10px; }
+  .sheet .row button { flex: 1; border-radius: 10px; padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; border: none; }
+  .sheet .row .cancel { background: #1e293b; color: #e2e8f0; }
+  .sheet .row .ok { background: #38bdf8; color: #020617; }
+  .sheet .agadd {
+    width: 100%; border: 1px dashed #334155; background: #020617; color: #b3c0d1;
+    border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .sheet .time-row, .sheet .rep-row { display: flex; gap: 10px; }
+  .sheet .time-row input, .sheet .rep-row input, .sheet select {
+    flex: 1; background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 15px; width: 100%;
+    font-family: inherit; color-scheme: dark;
+  }
+  .ag-actions .on { border-color: #34d399; color: #34d399; background: rgba(52,211,153,0.08); }
+  .ag-actions select, .ag-actions option {
+    background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 9px 8px; font-size: 13px; font-weight: 600;
+    font-family: inherit; color-scheme: dark;
+  }
+  .warnbar {
+    margin: 10px 12px 0; max-width: 560px; margin-left: auto; margin-right: auto;
+    background: rgba(251,191,36,0.08); border: 1px solid #fbbf24; border-radius: 12px;
+    padding: 10px 12px; font-size: 13px; color: #fbbf24; line-height: 1.5;
+    display: flex; gap: 10px; align-items: center;
+  }
+  .warnbar button {
+    border: none; background: transparent; color: #fbbf24; font-weight: 700;
+    cursor: pointer; font-size: 15px; margin-left: auto; flex: 0 0 auto;
+  }
+  :root { --muted: #8fa3bd; --ok: #34d399; } /* v13 : gris secondaire ~5:1 sur fond sombre, vert de succès */
+  html.light { --muted: #475569; --ok: #047857; } /* v13 : sur blanc, l'ancien #34d399 tombait à ~2:1 */
+  .syncline .pend { color: #38bdf8; font-weight: 700; } /* v13 : les statuts de la carte ☁️ sont enfin colorés */
+  .syncline .gone { color: #fb7185; font-weight: 700; }
+  .syncline .okline { color: var(--ok); font-weight: 700; }
+  .syncline { font-size: 12px; color: var(--muted); padding: 0 2px 6px; }
+  .task .meta .pend { color: #38bdf8; font-weight: 700; }
+  .task .meta .gone { color: #fb7185; font-weight: 700; }
+  .hbtns { display: flex; gap: 8px; align-items: center; }
+  .syncpill { font-size: 15px; cursor: pointer; line-height: 1; }
+  /* cibles tactiles ≥ 44 px (audit) */
+  .acts button, .rowbtn, .ld-foot button, .ag-actions button, .cfg-card button,
+  .data-card button, .subchips button, .addrow button, .chips .chip { min-height: 44px; }
+  .item .min, .item .del { min-width: 40px; min-height: 40px; }
+  .task .acts { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
+  .task .chk { flex: 0 0 36px; height: 36px; }
+  .item .chk { flex: 0 0 32px; height: 32px; }
+  /* saisie rapide + report + édition d'item */
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chips .chip {
+    border: 1px solid #334155; background: #020617; color: #cbd5e1;
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .chips .chip.on { border-color: #38bdf8; background: rgba(56,189,248,0.16); color: #e2e8f0; }
+  .chips input[type=date] {
+    flex: 1; min-width: 130px; background: #020617; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 10px; padding: 10px; font-size: 14px; font-family: inherit; color-scheme: dark;
+  }
+  .qag { font-size: 13px; color: #cbd5e1; display: flex; gap: 8px; align-items: center; }
+  .qag input { width: 18px; height: 18px; }
+  /* écran Aujourd'hui */
+  .tsec {
+    font-size: 13px; font-weight: 700; color: #38bdf8; margin: 16px 0 8px;
+    border-bottom: 1px solid #1e293b; padding-bottom: 6px;
+  }
+  .tsec-hint { font-size: 12px; color: #b3c0d1; padding: 4px 2px 10px; }
+  /* sections de l'onglet Tâches (v11) : retard en rouge, jour en vert */
+  .tsec.late { color: #fb7185; border-bottom-color: #7f1d1d; }
+  .tsec.today { color: #34d399; border-bottom-color: #14532d; }
+  html.light .tsec.late { color: #be123c; border-bottom-color: #fecdd3; }
+  html.light .tsec.today { color: #047857; border-bottom-color: #a7f3d0; }
+  /* toast avec bouton d'action (Annuler) */
+  #toast.act { pointer-events: auto; }
+  #toast button {
+    margin-left: 10px; border: none; background: #38bdf8; color: #020617;
+    border-radius: 8px; padding: 6px 12px; font-weight: 700; cursor: pointer;
+  }
+  /* ---------- Thème clair ☀️ ---------- */
+  html.light { color-scheme: light; }
+  html.light body { background: #eef2f7; color: #1e293b; }
+  html.light header { background: rgba(238,242,247,0.94); border-bottom-color: #cbd5e1; }
+  html.light .badge { color: #64748b; }
+  html.light .agbtn { background: #ffffff; border-color: #cbd5e1; color: #1e293b; }
+  html.light .tab { background: #ffffff; border-color: #cbd5e1; color: #334155; }
+  html.light .tab.active.tasks { border-color: #38bdf8; color: #0369a1; background: rgba(56,189,248,0.12); }
+  html.light .tab.active.urgent { border-color: #fb7185; color: #be123c; background: rgba(251,113,133,0.10); }
+  html.light .tab.active.week { border-color: #fbbf24; color: #b45309; background: rgba(251,191,36,0.10); }
+  html.light .tab.active.later { border-color: #34d399; color: #047857; background: rgba(52,211,153,0.10); }
+  html.light .tab.active.lists { border-color: #a78bfa; color: #6d28d9; background: rgba(167,139,250,0.10); }
+  html.light .tab.active.done { border-color: #94a3b8; color: #334155; background: rgba(100,116,139,0.10); }
+  html.light .task, html.light .listcard, html.light .item, html.light .ev, html.light .cfg-card, html.light .data-card { background: #ffffff; border-color: #dbe2ea; }
+  html.light .task .note, html.light .cfg-card .hint, html.light .data-card .hint, html.light .sheet .flabel { color: #64748b; }
+  html.light .task.done .title { color: #64748b; }
+  html.light .acts button, html.light .rowbtn, html.light .ld-foot button, html.light .ag-actions button,
+  html.light .cfg-card button, html.light .data-card button { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
+  html.light .empty { color: #64748b; }
+  html.light .bar { background: #dbe2ea; }
+  html.light .listcard .cnt, html.light .ld-head .cnt { color: #64748b; }
+  html.light .addrow input, html.light .addrow textarea, html.light .searchrow input, html.light .cfg-card input, html.light .data-card input { background: #ffffff; border-color: #cbd5e1; color: #1e293b; }
+  html.light .searchrow button { background: #e2e8f0; color: #475569; }
+  html.light .sheet { background: #ffffff; border-color: #cbd5e1; }
+  html.light .sheet input[type=text], html.light .sheet input[type=date], html.light .sheet input[type=number], html.light .sheet textarea,
+  html.light .sheet .time-row input, html.light .sheet .rep-row input, html.light .sheet select,
+  html.light .ag-actions select, html.light .ag-actions option { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; color-scheme: light; }
+  html.light .sheet .row .cancel { background: #e2e8f0; color: #1e293b; }
+  html.light .sheet .agadd { background: #f8fafc; color: #64748b; border-color: #cbd5e1; }
+  html.light .chips .chip { background: #f8fafc; border-color: #cbd5e1; color: #334155; }
+  html.light .chips .chip.on { border-color: #0284c7; background: rgba(2,132,199,0.12); color: #0f172a; }
+  html.light .chips input[type=date] { background: #ffffff; border-color: #cbd5e1; color: #1e293b; color-scheme: light; }
+  html.light .day-h { border-bottom-color: #cbd5e1; }
+  html.light .day-h.today { border-bottom-color: #bbf7d0; }
+  html.light .subchips button { background: #ffffff; color: #6d28d9; }
+  html.light .tsec { border-bottom-color: #cbd5e1; color: #0369a1; }
+  html.light .tsec-hint { color: #64748b; }
+  html.light .item .del { color: #64748b; }
+  /* v12 : finitions thème clair — textes hérités du sombre devenus illisibles */
+  html.light .task .meta { color: var(--muted); }
+  html.light .task .meta .rep, html.light .task .meta .due-today { color: #b45309; }
+  html.light .task .meta .late, html.light .task .meta .gone { color: #be123c; }
+  html.light .task .meta .pend { color: #0369a1; }
+  html.light .ev .meta, html.light .item .masked { color: #475569; }
+  html.light .ev-time { color: #0369a1; }
+  html.light .ev.allday .ev-time { color: #64748b; }
+  html.light .day-h { color: #334155; }
+  html.light .day-h small, html.light .day-h .day-count { color: #64748b; }
+  html.light .warnbar { background: #fef2f2; border-color: #fecdd3; color: #7f1d1d; }
+  html.light .warnbar button { background: #fee2e2; border-color: #fecdd3; color: #991b1b; }
+  html.light .addrow .sectgl { background: #f8fafc; border-color: #fbbf24; color: #64748b; }
+  #toast {
+    position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+    background: #1e293b; color: #f8fafc; border: 1px solid #334155;
+    border-radius: 12px; padding: 10px 16px; font-size: 14px;
+    opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 60;
+    max-width: 90%; text-align: center;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <div class="left">
+    <h1>📋 Mes tâches</h1>
+    <span class="badge">💾 auto · <span id="vBadge"></span></span>
+  </div>
+  <div class="hbtns">
+    <span id="syncPill" class="syncpill" onclick="showView('agenda')" title="Synchro Google">🟠</span>
+    <button id="themeBtn" class="agbtn" title="Thème clair / sombre" onclick="toggleTheme()">🌙</button>
+    <button class="agbtn" onclick="showView('agenda')" title="Agenda Google">📅</button>
+  </div>
+</header>
+<div id="view-tasks" class="wrap">
+  <nav id="tabbar"></nav>
+  <div class="searchrow">
+    <input type="text" id="searchInput" placeholder="🔍 Rechercher une tâche, une note, une liste…" oninput="setSearch(this.value)">
+    <button id="searchClear" class="hidden" onclick="setSearch('')">✕</button>
+  </div>
+  <div id="warnCard"></div>
+  <main id="list"></main>
+  <div class="data-card" id="backupCard"></div>
+</div>
+<div id="view-agenda" class="hidden">
+  <div class="ag-head">
+    <button class="rowbtn" onclick="showView('tasks')">← Tâches</button>
+    <h2>📅 Mon agenda</h2>
+  </div>
+  <div id="agBody"></div>
+</div>
+<div id="view-list" class="hidden">
+  <div id="listDetail"></div>
+</div>
+<input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="handleImport(event)">
+<button id="fab" onclick="onFab()">＋</button>
+<div id="modal" class="modal hidden">
+  <div class="sheet">
+    <div class="st" id="mLabel">Nouvelle tâche</div>
+    <input type="text" id="mTitle" placeholder="Que faut-il faire ?">
+    <textarea id="mNote" placeholder="Note (optionnelle)"></textarea>
+    <div class="flabel">📅 Début (échéance, tri automatique) — « Jusqu'au » = événement sur plusieurs jours</div>
+    <div class="time-row">
+      <input type="date" id="mDue" placeholder="Début">
+      <input type="date" id="mUntil" placeholder="Jusqu'au (optionnel)">
+    </div>
+    <div class="flabel">🕒 Horaires (optionnels) — vides = journée entière ; se répercutent dans l'agenda</div>
+    <div class="time-row">
+      <input type="time" id="mStart" placeholder="Début">
+      <input type="time" id="mEnd" placeholder="Fin">
+    </div>
+    <div class="flabel">🔁 Répétition (optionnelle) — toutes les occurrences partent dans l'agenda</div>
+    <select id="mRep" onchange="onRepChange()">
+      <option value="none">Pas de répétition</option>
+      <option value="daily">Chaque jour</option>
+      <option value="ndays">Tous les X jours…</option>
+      <option value="weekly">Chaque semaine</option>
+      <option value="2weeks">Toutes les 2 semaines</option>
+      <option value="monthly">Chaque mois</option>
+    </select>
+    <div class="rep-row" id="mRepRow" style="display:none">
+      <input type="number" id="mRepEvery" min="2" max="30" placeholder="X = tous les combien de jours ?" style="display:none">
+      <input type="number" id="mRepCount" min="1" max="500" placeholder="Nombre de fois (vide = sans fin)">
+    </div>
+    <div class="flabel">🏷️ Type — l'événement agenda sera 🔴 rouge (pro) ou 🔵 bleu (perso)</div>
+    <div class="cat-row type-row" id="mTypes" style="grid-template-columns:1fr 1fr"></div>
+    <div class="row">
+      <button class="cancel" onclick="closeModal()">Annuler</button>
+      <button class="ok" onclick="saveModal()">💾 Enregistrer (+ 📅)</button>
+    </div>
+    <button class="agadd" onclick="saveModal(false)">Enregistrer sans toucher à l'agenda</button>
+  </div>
+</div>
+<div id="listModal" class="modal hidden">
+  <div class="sheet">
+    <div class="st" id="lLabel">Nouvelle liste</div>
+    <input type="text" id="lName" placeholder="Nom de la liste (ex : Matériel manœuvre)">
+    <div class="row">
+      <button class="cancel" onclick="closeListModal()">Annuler</button>
+      <button class="ok" onclick="saveListModal()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+<div id="evModal" class="modal hidden">
+  <div class="sheet">
+    <div class="st" id="eLabel">Modifier l'événement</div>
+    <input type="text" id="eTitle" placeholder="Titre de l'événement">
+    <div class="flabel">📅 Dates — « Jusqu'au » = événement sur plusieurs jours</div>
+    <div class="time-row">
+      <input type="date" id="eDay" placeholder="Début">
+      <input type="date" id="eUntil" placeholder="Jusqu'au (optionnel)">
+    </div>
+    <div class="flabel">🕒 Horaires — vides = journée entière ; se répercutent dans ton agenda Google</div>
+    <div class="time-row">
+      <input type="time" id="eStart" placeholder="Début">
+      <input type="time" id="eEnd" placeholder="Fin">
+    </div>
+    <input type="text" id="eLoc" placeholder="Lieu (optionnel — copié dans la note de la tâche liée)">
+    <div class="row">
+      <button class="cancel" onclick="closeEvModal()">Annuler</button>
+      <button class="ok" onclick="agendaSaveEvent()">💾 Modifier dans Google Agenda</button>
+    </div>
+  </div>
+</div>
+<div id="quickModal" class="modal hidden">
+  <div class="sheet">
+    <div class="st">➕ Nouvelle tâche</div>
+    <input type="text" id="qTitle" placeholder="Que faut-il faire ?" onkeydown="if(event.key==='Enter'){quickSave()}">
+    <div class="chips">
+      <button id="q-today" class="chip on" onclick="quickPick('today')">Aujourd'hui</button>
+      <button id="q-tomorrow" class="chip" onclick="quickPick('tomorrow')">Demain</button>
+      <button id="q-week" class="chip" onclick="quickPick('week')">+7 jours</button>
+      <button id="q-none" class="chip" onclick="quickPick('none')">Sans date</button>
+      <input type="date" id="qDate" onchange="quickDateChange()">
+    </div>
+    <div class="chips">
+      <button id="qt-perso" class="chip on" onclick="quickPickType('perso')">🔵 Perso</button>
+      <button id="qt-pro" class="chip" onclick="quickPickType('pro')">🔴 Pro</button>
+    </div>
+    <label class="qag"><input type="checkbox" id="qAgenda"> Ajouter à l'agenda Google aussi</label>
+    <div class="row">
+      <button class="cancel" onclick="quickMore()">⚙️ Plus d'options</button>
+      <button class="ok" onclick="quickSave()">💾 Ajouter</button>
+    </div>
+  </div>
+</div>
+<div id="deferModal" class="modal hidden">
+  <div class="sheet">
+    <div class="st">⬅️ Reporter la tâche</div>
+    <div class="row">
+      <button class="cancel" id="dfrB1" onclick="deferBy(1)">Demain</button>
+      <button class="cancel" id="dfrB7" onclick="deferBy(7)">+7 jours</button>
+      <button class="cancel" id="dfrB14" onclick="deferBy(14)">+14 jours</button>
+    </div>
+    <div class="time-row">
+      <input type="date" id="dfrDate">
+      <button class="ok" style="flex:1;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;background:#38bdf8;color:#020617" onclick="deferPicked()">OK</button>
+    </div>
+  </div>
+</div>
+<div id="itemModal" class="modal hidden">
+  <div class="sheet">
+    <div class="st" id="iLabel">Modifier l'élément</div>
+    <input type="text" id="iText" placeholder="Texte de l'élément">
+    <div class="time-row">
+      <input type="number" id="iQty" min="1" max="999" placeholder="Quantité (optionnel)">
+    </div>
+    <label class="qag"><input type="checkbox" id="iSecret"> Code masqué 🔐</label>
+    <div class="row">
+      <button class="cancel" onclick="closeItemModal()">Annuler</button>
+      <button class="ok" onclick="saveItemModal()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+"use strict";
+
+// ===== Tâches & Relances — v13 : sauvegarde Drive multi-appareils sûre (pull-before-push, tombstones contre restauration, pannes par source), occurrences de séries protégées (repChild, résurrection 409), événements du jour en ligne, mode ⇅ réordonner =====
+var APP_VERSION = "v13";
+var KEY = "taches-relances-v2";
+var TABS = ["tasks", "lists", "done"];
+var CATS = ["urgent", "week", "later", "done"];
+var CAT_LABELS = { tasks: "📋 Tâches", lists: "🧺 Listes", done: "✅ Terminé" };
+var TYPES = ["pro", "perso"];
+var TYPE_LABELS = { pro: "🔴 Pro", perso: "🔵 Perso" };
+var DRIVE_FILE_NAME = "taches-relances.json";
+var DRIVE_DEFAULT_FOLDER = "taffbmpm";
+var DEFAULT_DATA = {
+  "savedAt": 0,
+  "tasks": [],
+  "lists": [
+    { "id": "starter-materiel", "name": "🎒 Matériel exercice", "createdAt": "2026-10-10", "items": [] }
+  ]
+};
+
+// ---------- Helpers ----------
+function uid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function pad2(n) { return (n < 10 ? "0" : "") + n; }
+function today() {
+  var d = new Date();
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+function addDaysISO(iso, n) {
+  var p = String(iso).split("-");
+  var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+  d.setDate(d.getDate() + n);
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+// +1 mois (occurrence suivante des tâches mensuelles) — le jour est borné au dernier jour du mois
+function addMonthsISO(iso, n) {
+  var p = String(iso).split("-");
+  var y = parseInt(p[0], 10), m0 = parseInt(p[1], 10) - 1, d = parseInt(p[2], 10);
+  var base = new Date(y, m0 + n, 1);
+  var last = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+  base.setDate(Math.min(d, last));
+  return base.getFullYear() + "-" + pad2(base.getMonth() + 1) + "-" + pad2(base.getDate());
+}
+// v13 : +1 mois en gardant le JOUR D'ORIGINE de la série (31 janvier → 28 février → 31 mars — pas 28→28→30 en cascade)
+function addMonthsISOFrom(iso, originDay, n) {
+  var p = String(iso).split("-");
+  var base = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1 + n, 1);
+  var last = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+  base.setDate(Math.min(originDay, last));
+  return base.getFullYear() + "-" + pad2(base.getMonth() + 1) + "-" + pad2(base.getDate());
+}
+// catégorie déduite de la date : passé/aujourd'hui → Urgent, cette semaine → Semaine, au-delà → Plus tard
+function catForDate(iso) {
+  var td = today();
+  if (!iso || iso <= td) return "urgent";
+  if (iso <= addDaysISO(td, 7)) return "week";
+  return "later";
+}
+function fmtDate(iso) {
+  if (!iso || typeof iso !== "string" || iso.length < 10) return "";
+  var p = iso.split("-");
+  return p[2] + "/" + p[1] + "/" + p[0];
+}
+function dayLabel(iso) {
+  var JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  var p = String(iso).split("-");
+  var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+  return JOURS[d.getDay()];
+}
+// libellé complet en français : « samedi 10 octobre »
+function dayLongLabel(iso) {
+  var JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  var MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  var p = String(iso).split("-");
+  var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+  return JOURS[d.getDay()] + " " + parseInt(p[2], 10) + " " + MOIS[parseInt(p[1], 10) - 1];
+}
+// en-tête de jour dans l'agenda : « Aujourd'hui — samedi 10 octobre », « Demain — … », sinon date complète
+function dayHeaderLabel(iso) {
+  var td = today();
+  if (iso === td) return "Aujourd'hui — " + dayLongLabel(iso);
+  if (iso === addDaysISO(td, 1)) return "Demain — " + dayLongLabel(iso);
+  return dayLongLabel(iso);
+}
+function deviceTz() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Paris"; }
+  catch (e) { return "Europe/Paris"; }
+}
+function validHM(v) {
+  return (typeof v === "string" && /^\d{2}:\d{2}$/.test(v)) ? v : null;
+}
+// heure de fin par défaut = début + 60 min (peut passer minuit -> plusDays)
+function hmPlus(hm, n) {
+  var p = String(hm).split(":");
+  var mins = parseInt(p[0], 10) * 60 + parseInt(p[1], 10) + n;
+  if (mins < 0) mins = 0;
+  return { hm: pad2(Math.floor((mins % 1440) / 60)) + ":" + pad2(mins % 60), plusDays: Math.floor(mins / 1440) };
+}
+// répétition normalisée : mode daily|ndays|weekly|2weeks|monthly, every (pour ndays), count (nb de fois, null = sans fin)
+function cleanRep(rep, dueIso) {
+  if (!rep || typeof rep !== "object") return null;
+  var modes = ["daily", "ndays", "weekly", "2weeks", "monthly"];
+  if (modes.indexOf(rep.mode) < 0) return null;
+  var every = null;
+  if (rep.mode === "ndays") {
+    every = parseInt(rep.every, 10);
+    if (isNaN(every)) return null;
+    every = Math.max(2, Math.min(30, every));
+  }
+  var count = parseInt(rep.count, 10);
+  count = (isNaN(count) || count < 1) ? null : Math.min(500, count);
+  var day = null;
+  if (rep.mode === "monthly") { // v13 : jour d'ORIGINE de la série — le 31 janvier suit 28/29 février puis REVIENT au 31
+    if (typeof rep.day === "number" && rep.day >= 1 && rep.day <= 31) day = rep.day;
+    else if (dueIso && /^\d{4}-\d{2}-\d{2}$/.test(dueIso)) day = parseInt(dueIso.slice(8, 10), 10);
+  }
+  return { mode: rep.mode, every: every, count: count, day: day };
+}
+// traduit en règle RRULE pour l'API Google Calendar (FREQ obligatoire ; INTERVAL = tous les X ; COUNT = nombre de fois)
+function repToRule(rep) {
+  var r = cleanRep(rep);
+  if (!r) return null;
+  var rule;
+  if (r.mode === "daily") rule = "RRULE:FREQ=DAILY";
+  else if (r.mode === "ndays") rule = "RRULE:FREQ=DAILY;INTERVAL=" + r.every;
+  else if (r.mode === "weekly") rule = "RRULE:FREQ=WEEKLY";
+  else if (r.mode === "2weeks") rule = "RRULE:FREQ=WEEKLY;INTERVAL=2";
+  else rule = "RRULE:FREQ=MONTHLY";
+  if (r.count) rule += ";COUNT=" + r.count;
+  return rule;
+}
+function repLabel(rep) {
+  var r = cleanRep(rep);
+  if (!r) return "";
+  var s;
+  if (r.mode === "daily") s = "chaque jour";
+  else if (r.mode === "ndays") s = "tous les " + r.every + " jours";
+  else if (r.mode === "weekly") s = "chaque semaine";
+  else if (r.mode === "2weeks") s = "toutes les 2 semaines";
+  else s = "chaque mois";
+  if (r.count) s += " · " + r.count + " fois";
+  return s;
+}
+// v13 : nombre de jours entre deux dates ISO (pour décaler une durée au report)
+function daysDiffISO(a, b) {
+  var pa = String(a).split("-"), pb = String(b).split("-");
+  var da = new Date(parseInt(pa[0], 10), parseInt(pa[1], 10) - 1, parseInt(pa[2], 10));
+  var db = new Date(parseInt(pb[0], 10), parseInt(pb[1], 10) - 1, parseInt(pb[2], 10));
+  return Math.round((db - da) / 86400000);
+}
+// « Jusqu'au » valide : uniquement si une date de début existe et si fin >= début
+function cleanUntil(due, until) {
+  if (typeof until !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(until)) return null;
+  if (typeof due !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(due)) return null;
+  return (until >= due) ? until : null;
+}
+function stripEvTitle(s) {
+  return String(s || "").replace(/^(🔴|🔵)\s*/, "");
+}
+function fmtAgo(ts) {
+  if (!ts) return "jamais";
+  var m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return "à l'instant";
+  if (m < 60) return "il y a " + m + " min";
+  var h = Math.floor(m / 60);
+  if (h < 24) return "il y a " + h + " h";
+  return fmtDate(new Date(ts).toISOString().slice(0, 10));
+}
+function agendaWindowDays() {
+  var cfg = state.cfg || {};
+  var d = parseInt(cfg.agendaDays, 10);
+  if (d === 7 || d === 14 || d === 30) return d;
+  return 30;
+}
+
+// ---------- État ----------
+function normalize(p) {
+  var _se = (p.syncErrors && typeof p.syncErrors === "object") ? Object.assign({}, p.syncErrors) : {}; // v13 : une panne PAR SOURCE (agenda / Drive)
+  if (p.syncError && typeof p.syncError === "object" && p.syncError.scope && !_se[p.syncError.scope]) _se[p.syncError.scope] = p.syncError; // v13 : migration de l'ancien slot unique
+  return {
+    tasks: Array.isArray(p.tasks) ? p.tasks : [],
+    lists: Array.isArray(p.lists) ? p.lists : [],
+    cfg: (p.cfg && typeof p.cfg === "object") ? p.cfg : null,
+    agendaCache: (p.agendaCache && typeof p.agendaCache === "object") ? p.agendaCache : null,
+    autoAgenda: p.autoAgenda === true,
+    importedEvents: (p.importedEvents && typeof p.importedEvents === "object") ? p.importedEvents : {},
+    autoBackup: p.autoBackup !== false,
+    hideWarn: p.hideWarn === true,
+    pendingEventDeletes: Array.isArray(p.pendingEventDeletes) ? p.pendingEventDeletes : [],
+    tombstones: Array.isArray(p.tombstones) ? p.tombstones : [], // v12 : elles étaient écrites mais perdues au rechargement
+    driveSyncedAt: p.driveSyncedAt || null,
+    syncError: null, // v13 : remplacé par syncErrors — une 2e panne n'efface plus la 1re
+    syncErrors: _se,
+    dirty: p.dirty === true // v13 : l'état non envoyé sur Drive survit au rechargement
+  };
+}
+function load() {
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) {
+      var p = JSON.parse(raw);
+      var pSaved = p.savedAt || 0;
+      var dSaved = (DEFAULT_DATA && DEFAULT_DATA.savedAt) || 0;
+      if (pSaved >= dSaved) return normalize(p);
+      // stockage plus ancien que le fichier ouvert -> ignorer
+    }
+  } catch (e) {}
+  if (typeof DEFAULT_DATA !== "undefined" && DEFAULT_DATA && Array.isArray(DEFAULT_DATA.tasks)) {
+    return normalize({ tasks: DEFAULT_DATA.tasks, lists: DEFAULT_DATA.lists || [] });
+  }
+  return { tasks: [], lists: [], cfg: null, agendaCache: null };
+}
+function persist() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify({
+      tasks: state.tasks, lists: state.lists, cfg: state.cfg,
+      agendaCache: state.agendaCache, savedAt: Date.now(),
+      autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
+      autoBackup: state.autoBackup !== false,
+      hideWarn: state.hideWarn === true,
+      pendingEventDeletes: state.pendingEventDeletes || [],
+      tombstones: state.tombstones || [],
+      driveSyncedAt: state.driveSyncedAt || null,
+      syncErrors: state.syncErrors || {},
+      dirty: _dirty === true // v13 : un état jamais envoyé survit au rechargement de la page
+    }));
+  } catch (e) {
+    // quota localStorage dépassé ou stockage refusé : ne jamais rester silencieux
+    try { showToast("⚠️ Sauvegarde locale impossible — fais un export 💾 immédiatement !"); } catch (e2) {}
+  }
+}
+function save() {
+  stampUpdates();
+  _dirty = true; // v12 : l'état a changé → un passage en arrière-plan doit l'envoyer sur Drive
+  _saveSeq++; // v13 : changements survenus PENDANT un envoi Drive → détectés au retour
+  persist();
+  scheduleDriveBackup();
+}
+// horodatage des éléments modifiés depuis la dernière sauvegarde (fusion multi-appareils)
+// v12 : la signature EXCLUT updatedAt — sinon tout élément retamponné re-diffère à chaque save()
+// et l'appareil qui enregistre le plus récemment gagne sur TOUT (modifs distantes perdues).
+var _shadow = {};
+var _dirty = false; // v12 : true tant que l'état local n'est pas encore sur Drive (consommé au passage en arrière-plan)
+var _saveSeq = 0;   // v13 : compteur de save() — un envoi Drive le capture et détecte les modifs survenues pendant l'envoi
+function sig(x) {
+  var c = Object.assign({}, x);
+  delete c.updatedAt;
+  return JSON.stringify(c);
+}
+function primeShadow() {
+  state.tasks.concat(state.lists).forEach(function (x) { _shadow[x.id] = sig(x); });
+}
+function stampUpdates() {
+  var now = Date.now();
+  state.tasks.concat(state.lists).forEach(function (x) {
+    var s = sig(x);
+    if (_shadow[x.id] !== s) x.updatedAt = now; // vraiment modifié depuis la dernière fois
+    _shadow[x.id] = s;
+  });
+}
+function addTombstone(id, kind) {
+  state.tombstones = state.tombstones || [];
+  if (!state.tombstones.some(function (tb) { return tb.id === id; })) {
+    state.tombstones.push({ id: id, kind: kind || "task", at: Date.now() });
+  }
+}
+// Sauvegarde Drive automatique : 30 s après le dernier changement (si Drive configuré)
+var driveTimer = null;
+function scheduleDriveBackup() {
+  if (typeof driveCfgOk === "function" && !driveCfgOk()) return;
+  if (state.autoBackup === false) return;
+  if (driveTimer) clearTimeout(driveTimer);
+  driveTimer = setTimeout(function () { driveTimer = null; driveBackupNow(true); }, 30000);
+}
+function storedSavedAt() {
+  try {
+    var p = JSON.parse(localStorage.getItem(KEY) || "null");
+    return (p && p.savedAt) || 0;
+  } catch (e) { return 0; }
+}
+var state = load();
+primeShadow(); // v12 : l'état au chargement sert de référence — un save() sans vrai changement ne retampone rien
+_dirty = state.dirty === true; // v13 : l'état non envoyé de la session précédente est repris
+if (_dirty) scheduleDriveBackup(); // v13 : et repart sans attendre une autre modification
+var tab = "tasks"; // accueil = onglet 📋 Tâches, classé par date puis horaire
+var view = "tasks";        // "tasks" | "agenda" | "list"
+var currentListId = null;  // liste ouverte en détail
+var editId = null;         // tâche éditée
+var editListId = null;     // liste éditée
+var newListParent = null;  // parent de la prochaine sous-liste créée
+var armed = {};            // suppressions à confirmer (id -> timestamp)
+var searchQ = "";         // recherche live (tâches + listes), non persistée
+var revealed = {};         // codes révélés (transitoire, jamais persisté)
+var secretNext = false;    // mode « prochain élément = code masqué »
+
+// ---------- Recherche live ----------
+function setSearch(v) {
+  searchQ = String(v || "").trim().toLowerCase();
+  var c = document.getElementById("searchClear");
+  if (c) c.className = searchQ ? "" : "hidden";
+  renderAll();
+}
+
+// ---------- Copier dans le presse-papier (SMS, WhatsApp…) ----------
+function copyText(txt, msg) {
+  function fallback() {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand && document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (ok) showToast(msg || "📋 Copié");
+      else showToast("⚠️ Copie impossible — sélectionne à la main");
+    } catch (e) { showToast("⚠️ Copie impossible"); }
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function () { showToast(msg || "📋 Copié"); }, function () { fallback(); });
+      return;
+    }
+  } catch (e) {}
+  fallback();
+}
+
+// ---------- Urgence : échéances ----------
+// v12 : promoteOverdue() supprimé — l'urgence se DÉDUIT à l'affichage (catForDate / bordure au rendu).
+// Écrire dans l'état pendant le rendu faussait updatedAt, donc la fusion multi-appareils.
+function cmpTasks(a, b) {
+  var da = a.due || "9999-99-99", db = b.due || "9999-99-99";
+  if (da !== db) return da < db ? -1 : 1;
+  return 0;
+}
+function dueHtml(t) {
+  var out = [];
+  if (t.due) {
+    var multi = t.until && t.until !== t.due;
+    if (t.cat === "done") {
+      out.push(multi ? ("📅 du " + fmtDate(t.due) + " au " + fmtDate(t.until)) : "📅 " + fmtDate(t.due));
+    } else {
+      var td = today();
+      if (multi) out.push("📅 du " + fmtDate(t.due) + " au " + fmtDate(t.until));
+      else if (t.due < td) out.push('<span class="late">⚠️ en retard du ' + fmtDate(t.due) + "</span>");
+      else if (t.due === td) out.push('<span class="due-today">📅 aujourd\'hui</span>');
+      else if (t.due === addDaysISO(td, 1)) out.push("📅 demain");
+      else out.push("📅 " + fmtDate(t.due));
+    }
+    if (t.startT) out.push("🕒 " + t.startT + (t.endT ? "–" + t.endT : ""));
+  }
+  if (t.rep) {
+    var rl = repLabel(t.rep);
+    if (rl) out.push('<span class="rep">🔁 ' + rl + "</span>");
+  }
+  return out.join(" · ");
+}
+
+// ---------- Tâches ----------
+function getTask(id) {
+  for (var i = 0; i < state.tasks.length; i++) {
+    if (state.tasks[i].id === id) return state.tasks[i];
+  }
+  return null;
+}
+function addTask(title, note, cat, due, type, extra) {
+  extra = extra || {};
+  var t = {
+    id: (typeof extra.id === "string" && /^[\w-]{1,64}$/.test(extra.id) && !getTask(extra.id)) ? extra.id : uid(), // v12 : id déterministe possible (imports agenda → dédoublonnage multi-appareils)
+    title: title,
+    note: note || "",
+    cat: (CATS.indexOf(cat) >= 0 && cat !== "done") ? cat : "urgent",
+    due: (typeof due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(due)) ? due : null,
+    type: (TYPES.indexOf(type) >= 0) ? type : "perso",
+    startT: validHM(extra.startT),
+    endT: validHM(extra.endT),
+    until: cleanUntil(due, extra.until),
+    rep: cleanRep(extra.rep, due),
+    gEventId: (typeof extra.gEventId === "string" && extra.gEventId) ? extra.gEventId : null,
+    autoImport: extra.autoImport === true,
+    repChild: extra.repChild === true, // v12 : occurrence suivante d'une répétition (jamais liée à l'événement maître)
+    gSync: extra.gSync || null,
+    localEdit: false,
+    evGone: false,
+    createdAt: today(),
+    deferredFrom: null,
+    doneAt: null
+  };
+  state.tasks.unshift(t);
+  save();
+  return t;
+}
+function editTask(id, title, note, cat, due, type, extra) {
+  var t = getTask(id);
+  if (!t) return false;
+  extra = extra || {};
+  t.title = title;
+  t.note = note || "";
+  if (CATS.indexOf(cat) >= 0) t.cat = cat;
+  if (TYPES.indexOf(type) >= 0) t.type = type;
+  if (t.cat !== "done") t.doneAt = null;
+  t.due = (typeof due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(due)) ? due : null;
+  t.startT = validHM(extra.startT);
+  t.endT = validHM(extra.endT);
+  t.until = cleanUntil(t.due, extra.until);
+  t.rep = cleanRep(extra.rep, t.due); // v13 : le jour d'origine mensuel suit l'édition
+  if (t.autoImport) t.localEdit = true; // tu l'as modifiée : Google ne l'écrasera plus
+  save();
+  return true;
+}
+// ---------- Annuler (5 s) : le dernier ✓ ou 🗑️ peut être annulé ----------
+var _undo = null;
+function snapshotTask(t) { return JSON.parse(JSON.stringify(t)); }
+function removeTombstone(id) {
+  state.tombstones = (state.tombstones || []).filter(function (x) { return x.id !== id; });
+}
+// tâche répétée cochée → l'occurrence suivante est créée immédiatement (catégorie déduite de la date)
+function nextOccurrence(t) {
+  var r = cleanRep(t.rep);
+  if (!r || !t.due) return null;
+  if (r.count !== null && r.count <= 1) return null; // dernière occurrence du cycle : rien à créer
+  var step = (r.mode === "daily") ? 1 : (r.mode === "ndays") ? r.every : (r.mode === "weekly") ? 7 : (r.mode === "2weeks") ? 14 : 0;
+  var od = (r.mode === "monthly") ? (r.day || parseInt(String(t.due).slice(8, 10), 10) || 1) : 0; // v13 : jour d'origine — le 31 ne dérive pas vers le 28
+  var nd = step ? addDaysISO(t.due, step) : addMonthsISOFrom(t.due, od, 1);
+  var guard = 0;
+  while (nd <= today() && guard < 500) { // v12 : cochée en retard → la prochaine occurrence est APRÈS aujourd'hui
+    nd = step ? addDaysISO(nd, step) : addMonthsISOFrom(nd, od, 1);
+    guard++;
+  }
+  var nrep = { mode: r.mode, every: r.every, count: (r.count !== null) ? r.count - 1 : null, day: (r.mode === "monthly") ? od : null }; // v13 : le clone garde le jour d'origine
+  return addTask(t.title, t.note, catForDate(nd), nd, t.type, {
+    startT: t.startT, endT: t.endT, until: null, rep: nrep, repChild: true,
+    gEventId: null, autoImport: false, gSync: null // v12 : le clone ne pointe PAS vers l'événement de l'original (sinon l'éditer décalait la série Google)
+  });
+}
+function completeTask(id) {
+  var t = getTask(id);
+  if (!t) return false;
+  var snap = snapshotTask(t);
+  var clone = nextOccurrence(t); // répétition : la prochaine occurrence existe déjà pour la suite
+  t.cat = "done";
+  t.doneAt = today();
+  t.deferredFrom = null;
+  save();
+  _undo = { kind: "complete", snap: snap, cloneId: clone ? clone.id : null };
+  showToast(clone ? "✅ Fait — prochaine occurrence le " + fmtDate(clone.due) : "✅ Tâche faite", { action: "Annuler", ttl: 5000 });
+  return true;
+}
+// Reporter : ouvre la feuille de report — la date change VRAIMENT (demain, +7 j, date au choix)
+function deferTask(id) { openDeferSheet(id); }
+function deferTo(id, iso) {
+  var t = getTask(id);
+  if (!t || !iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  var from = t.due || today();
+  var dur = (t.until && t.due && t.until >= t.due) ? daysDiffISO(t.due, t.until) : 0; // v13 : reporter ne raccourcit pas une tâche multi-jours
+  t.deferredFrom = from;
+  t.due = iso;
+  if (t.autoImport) t.localEdit = true; // v12 : tâche importée reportée → Google ne l'écrase plus au prochain balayage
+  t.cat = catForDate(iso);
+  t.doneAt = null;
+  t.until = dur > 0 ? addDaysISO(iso, dur) : cleanUntil(iso, t.until); // v13 : la durée est DÉCALÉE, pas réduite
+  save();
+  closeDeferSheet();
+  renderAll();
+  showToast("⬅️ Reportée au " + fmtDate(iso) + (t.until && t.until !== t.due ? " → " + fmtDate(t.until) : ""));
+  // la tâche avait créé un retour agenda (pas une import) → l'événement suit le report
+  // v13 : SAUF le maître d'une série (rep) — le déplacer déplacerait TOUTE la série Google
+  if (t.gEventId && !t.autoImport && !t.rep && String(t.gEventId).indexOf("_") < 0 && state.cfg && state.cfg.cid && state.cfg.refresh) taskToEvent(t.id);
+  return true;
+}
+function reactivateTask(id) {
+  var t = getTask(id);
+  if (!t) return false;
+  t.cat = "urgent";
+  t.doneAt = null;
+  save();
+  return true;
+}
+function deleteTask(id) {
+  var t = getTask(id);
+  var n = 0;
+  state.tasks = state.tasks.filter(function (x) { if (x.id !== id) return true; n++; return false; });
+  delete armed[id];
+  if (n > 0) {
+    addTombstone(id, "task"); // pierre tombale : la suppression se propage aux autres appareils
+    delete _shadow[id]; // v13 : recréer ce même id (annulation, nouveau ＋ sur un « ev-… ») repart d'un updatedAt tout neuf
+    // la tâche avait créé un événement agenda → on le retire aussi (les tâches importées de l'agenda n'y touchent pas)
+    if (t && t.gEventId && !t.autoImport && !t.rep) agendaDeleteEvent(t.gEventId, t.title); // v12 : une tâche répétée ne supprime JAMAIS l'événement maître de la série
+    else if (t && t.rep && t.gEventId && !t.autoImport && String(t.gEventId).indexOf("_") < 0) {
+      // v13 : l'inverse du garde v12 — supprimer le MAÎTRE d'une série doit demander : la série Google reste-t-elle
+      // dans l'agenda ? Sans question, l'import auto ramenait ses occurrences en tâches juste après.
+      var okDel = (typeof confirm === "function") ? confirm("Supprimer aussi la série « " + t.title + " » dans Google Agenda ?\nOK = la série part de l'agenda aussi · Annuler = elle y reste.") : false;
+      if (okDel) agendaDeleteEvent(t.gEventId, t.title);
+    }
+    save();
+    _undo = { kind: "delete", snap: snapshotTask(t) };
+    showToast("🗑️ Tâche supprimée", { action: "Annuler", ttl: 5000 });
+  }
+  return n > 0;
+}
+// bouton « Annuler » du toast (5 s) : restaure le dernier ✓ ou 🗑️
+function undoLast() {
+  var u = _undo;
+  _undo = null;
+  if (!u) return;
+  if (u.kind === "complete") {
+    var t = getTask(u.snap.id);
+    if (t) { t.cat = u.snap.cat; t.doneAt = u.snap.doneAt; t.deferredFrom = u.snap.deferredFrom; }
+    if (u.cloneId && getTask(u.cloneId)) {
+      state.tasks = state.tasks.filter(function (x) { return x.id !== u.cloneId; });
+      addTombstone(u.cloneId, "task"); // v12 : sans pierre tombale, Drive ressusciterait le clone annulé
+      delete _shadow[u.cloneId]; // v13 : id recréable proprement (updatedAt neuf)
+    }
+    save();
+    showToast("↩️ Tâche restaurée (pas marquée faite)");
+  } else if (u.kind === "delete") {
+    if (!getTask(u.snap.id)) state.tasks.unshift(u.snap);
+    removeTombstone(u.snap.id); // la suppression est annulée : la pierre tombale disparaît (sinon Drive la re-supprimerait)
+    delete _shadow[u.snap.id]; // v13 : restaurée sous le même id → updatedAt tout neuf (une pierre tombale distante plus récente ne la re-tuera pas)
+    if (u.snap.gEventId) {
+      // v12 : une suppression d'événement encore en attente ne doit pas être rejouée sur la tâche restaurée
+      state.pendingEventDeletes = (state.pendingEventDeletes || []).filter(function (e) { return e !== u.snap.gEventId; });
+    }
+    save();
+    if (u.snap.gEventId && !u.snap.autoImport && String(u.snap.gEventId).indexOf("_") < 0 && state.cfg && state.cfg.cid && state.cfg.refresh) taskToEvent(u.snap.id); // l'événement est recréé au besoin (404 → recréation)
+    showToast("↩️ Tâche restaurée");
+  }
+  try { renderAll(); } catch (e) {}
+}
+function counts() {
+  var c = { tasks: 0, today: 0, urgent: 0, week: 0, later: 0, done: 0, lists: state.lists.length };
+  var td = today();
+  state.tasks.forEach(function (t) {
+    if (c[t.cat] !== undefined) c[t.cat]++;
+    if (t.cat !== "done") c.tasks++; // compteur de l'onglet 📋 Tâches
+    if (t.cat !== "done" && t.due && t.due <= td) c.today++; // badge d'icône = retards + échéances du jour
+  });
+  return c;
+}
+function onDelete(id) {
+  deleteTask(id); // v12 : suppression directe — l'annulation de 5 s du toast la remplace (le double tap reste pour les listes)
+  renderAll();
+}
+
+// ---------- Listes de matériel ----------
+function getList(id) {
+  for (var i = 0; i < state.lists.length; i++) {
+    if (state.lists[i].id === id) return state.lists[i];
+  }
+  return null;
+}
+function addList(name, parent) {
+  var p = (typeof parent === "string" && getList(parent)) ? parent : null;
+  var l = { id: uid(), name: name, createdAt: today(), parent: p, items: [] };
+  if (p) {
+    var pi = state.lists.indexOf(getList(p));
+    state.lists.splice(pi >= 0 ? pi + 1 : 0, 0, l);
+  } else {
+    state.lists.unshift(l);
+  }
+  save();
+  return l;
+}
+function renameList(id, name) {
+  var l = getList(id);
+  if (!l) return false;
+  l.name = name;
+  save();
+  return true;
+}
+function deleteList(id) {
+  var n = 0;
+  state.lists = state.lists.filter(function (l) { if (l.id !== id) return true; n++; return false; });
+  state.lists.forEach(function (l) { if (l.parent === id) l.parent = null; });
+  delete armed["L:" + id];
+  if (currentListId === id) { currentListId = null; }
+  if (n > 0) { addTombstone(id, "list"); delete _shadow[id]; save(); } // v13 : id recréable proprement
+  return n > 0;
+}
+// « 4x pulkas » / « 4 × pulkas » → quantité 4, texte « pulkas »
+function parseQty(text) {
+  var m = String(text).match(/^(\d{1,3})\s*[x×]\s*(.+)$/i);
+  if (!m) return { qty: null, text: String(text) };
+  return { qty: parseInt(m[1], 10), text: m[2] };
+}
+function addItem(listId, text, secret) {
+  var l = getList(listId);
+  if (!l) return null;
+  // un code masqué n'est jamais décomposé en quantité (« 4x1234 » reste le code entier)
+  var pq = (secret === true) ? { qty: null, text: String(text) } : parseQty(text);
+  var it = { id: uid(), text: pq.text, done: false, qty: pq.qty, secret: secret === true };
+  l.items.push(it);
+  save();
+  return it;
+}
+function toggleItem(listId, itemId) {
+  var l = getList(listId);
+  if (!l) return false;
+  for (var i = 0; i < l.items.length; i++) {
+    if (l.items[i].id === itemId) { l.items[i].done = !l.items[i].done; save(); return true; }
+  }
+  return false;
+}
+function deleteItem(listId, itemId) {
+  var l = getList(listId);
+  if (!l) return false;
+  var n = 0;
+  l.items = l.items.filter(function (it) { if (it.id !== itemId) return true; n++; return false; });
+  if (n > 0) save();
+  return n > 0;
+}
+// réordonner : ▲▼ (dir = -1 / +1), sans effet en bord de liste
+var reorderMode = false; // v13 : mode ⇅ — les lignes normales ne gardent que case + texte + ✕ (360 px ne tenait pas 6 boutons)
+function toggleReorderMode() { reorderMode = !reorderMode; renderAll(); }
+function moveItem(listId, itemId, dir) {
+  var l = getList(listId);
+  if (!l) return false;
+  var i = -1;
+  for (var k = 0; k < l.items.length; k++) { if (l.items[k].id === itemId) { i = k; break; } }
+  if (i < 0) return false;
+  var j = i + (dir < 0 ? -1 : 1);
+  if (j < 0 || j >= l.items.length) return false;
+  var tmp = l.items[i]; l.items[i] = l.items[j]; l.items[j] = tmp;
+  save();
+  return true;
+}
+function resetChecks(listId) {
+  var l = getList(listId);
+  if (!l) return false;
+  l.items.forEach(function (it) { it.done = false; });
+  save();
+  return true;
+}
+// copie récursive des sous-listes (duplication et « Nouvelle depuis modèle »)
+function cloneSubLists(srcId, newParentId) {
+  state.lists.filter(function (c) { return c.parent === srcId; }).forEach(function (c) {
+    var cc = {
+      id: uid(), name: c.name, createdAt: today(), parent: newParentId, template: false,
+      items: c.items.map(function (it) { return { id: uid(), text: it.text, done: false, qty: it.qty || null, secret: it.secret === true }; })
+    };
+    state.lists.push(cc);
+    cloneSubLists(c.id, cc.id); // sous-listes de sous-listes : tout l'arbre est copié
+  });
+}
+function duplicateList(listId) {
+  var src = getList(listId);
+  if (!src) return null;
+  var copy = {
+    id: uid(),
+    name: src.name + " (copie)",
+    createdAt: today(),
+    parent: src.parent || null,
+    template: false, // une copie n'est jamais un modèle
+    items: src.items.map(function (it) { return { id: uid(), text: it.text, done: false, qty: it.qty || null, secret: it.secret === true }; })
+  };
+  state.lists.unshift(copy);
+  cloneSubLists(src.id, copy.id); // les sous-listes sont dupliquées aussi
+  save();
+  return copy;
+}
+// liste figée comme modèle → « ➕ Nouvelle depuis » crée une copie neuve pour chaque exercice
+function toggleTemplate(id) {
+  var l = getList(id);
+  if (!l) return false;
+  l.template = !(l.template === true);
+  save();
+  renderAll();
+  showToast(l.template ? "📌 « " + l.name + " » gardée comme modèle — « ➕ Nouvelle depuis » à chaque exercice" : "📌 Modèle désactivé");
+  return true;
+}
+function newFromTemplate(id) {
+  var src = getList(id);
+  if (!src) return null;
+  var copy = {
+    id: uid(),
+    name: src.name + " — " + fmtDate(today()),
+    createdAt: today(),
+    parent: src.parent || null,
+    template: false, // la nouvelle liste n'est pas un modèle
+    items: src.items.map(function (it) { return { id: uid(), text: it.text, done: false, qty: it.qty || null, secret: it.secret === true }; })
+  };
+  state.lists.unshift(copy);
+  cloneSubLists(src.id, copy.id); // les sous-listes du modèle sont créées aussi, cochages à zéro
+  save();
+  openList(copy.id);
+  showToast("📋 Liste créée depuis le modèle — cochages à zéro");
+  return copy;
+}
+// copier une liste en texte (SMS, WhatsApp…) — les codes restent masqués
+function buildListText(l) {
+  var lines = ["📋 " + l.name];
+  l.items.forEach(function (it) {
+    var box = it.done ? "☒" : "☐";
+    var q = it.qty ? it.qty + " × " : "";
+    var val = it.secret ? "•••••• (code masqué)" : it.text;
+    lines.push(box + " " + q + val);
+  });
+  if (l.items.length === 0) lines.push("(liste vide)");
+  return lines.join("\n");
+}
+// 📤 Partager : partage natif du téléphone si dispo, sinon copie dans le presse-papier
+function shareList(listId) {
+  var l = getList(listId);
+  if (!l) return false;
+  var txt = buildListText(l);
+  try {
+    if (navigator.share) { navigator.share({ title: l.name, text: txt }).catch(function () {}); return true; }
+  } catch (e) {}
+  copyText(txt, "📤 Liste copiée — colle-la dans un SMS, WhatsApp…");
+  return true;
+}
+function copyListText(listId) {
+  var l = getList(listId);
+  if (!l) return false;
+  copyText(buildListText(l), "📤 Liste copiée — colle-la dans un SMS, WhatsApp…");
+  return true;
+}
+// codes masqués : révélation transitoire + copie sans révéler à l'écran
+function toggleReveal(itemId) {
+  revealed[itemId] = !revealed[itemId];
+  renderAll();
+}
+function toggleSecretNext() {
+  secretNext = !secretNext;
+  renderAll();
+  showToast(secretNext ? "🔐 Mode code masqué : le prochain élément sera masqué ••••••" : "Mode code masqué désactivé");
+}
+function copyItemSecret(listId, itemId) {
+  var l = getList(listId);
+  if (!l) return false;
+  for (var i = 0; i < l.items.length; i++) {
+    if (l.items[i].id === itemId) {
+      copyText(l.items[i].text, "📋 Code copié — colle-le où tu veux");
+      return true;
+    }
+  }
+  return false;
+}
+function listProgress(l) {
+  var done = 0;
+  l.items.forEach(function (it) { if (it.done) done++; });
+  return { done: done, total: l.items.length };
+}
+// progression TOTALE d'une branche : la liste + toutes ses sous-listes (récursif)
+function listProgressAgg(l) {
+  var agg = listProgress(l);
+  state.lists.filter(function (c) { return c.parent === l.id; }).forEach(function (c) {
+    var p = listProgressAgg(c);
+    agg.done += p.done;
+    agg.total += p.total;
+  });
+  return agg;
+}
+// 🙈 masquer les éléments déjà cochés (état mémorisé par liste)
+function toggleHideDone(listId) {
+  var l = getList(listId);
+  if (!l) return false;
+  l.hideDone = !(l.hideDone === true);
+  save();
+  renderAll();
+  return true;
+}
+// ✏️ modifier un élément (texte, quantité, code masqué)
+var editItemIds = null;
+function openItemModal(listId, itemId) {
+  var l = getList(listId);
+  if (!l) return;
+  var it = l.items.filter(function (x) { return x.id === itemId; })[0];
+  if (!it) return;
+  editItemIds = { listId: listId, itemId: itemId };
+  document.getElementById("iLabel").textContent = "Modifier l'élément";
+  document.getElementById("iText").value = it.text;
+  document.getElementById("iQty").value = it.qty || "";
+  document.getElementById("iSecret").checked = it.secret === true;
+  document.getElementById("itemModal").className = "modal";
+}
+function closeItemModal() {
+  document.getElementById("itemModal").className = "modal hidden";
+  editItemIds = null;
+}
+function saveItemModal() {
+  if (!editItemIds) return;
+  var l = getList(editItemIds.listId);
+  var it = l && l.items.filter(function (x) { return x.id === editItemIds.itemId; })[0];
+  if (!it) { closeItemModal(); return; }
+  var v = (document.getElementById("iText").value || "").trim();
+  if (!v) { showToast("⚠️ Le texte de l'élément ne peut pas être vide"); return; }
+  var secret = document.getElementById("iSecret").checked === true;
+  var q = parseInt((document.getElementById("iQty").value || ""), 10);
+  it.text = v;
+  it.qty = (!secret && !isNaN(q) && q > 0 && q < 1000) ? q : null; // un code masqué n'a jamais de quantité
+  it.secret = secret;
+  save();
+  closeItemModal();
+  renderAll();
+  showToast("✅ Élément modifié");
+}
+function onDeleteList(id) {
+  var key = "L:" + id;
+  if (armed[key]) { deleteList(id); }
+  else {
+    armed[key] = Date.now();
+    setTimeout(function () { delete armed[key]; try { renderAll(); } catch (e) {} }, 3000);
+  }
+  renderAll();
+}
+function openList(id) {
+  if (!getList(id)) return;
+  currentListId = id;
+  showView("list");
+}
+
+// ---------- Export / Import ----------
+function exportData() {
+  return {
+    app: "taches-relances", version: 13, tasks: state.tasks, lists: state.lists,
+    autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
+    tombstones: state.tombstones || [],
+    savedAt: Date.now()
+  };
+}
+// Normalisation d'une tâche importée/fusionnée (partagée par import et fusion Drive)
+function normalizeTaskIn(t) {
+  return {
+    id: (typeof t.id === "string" && /^[\w-]{1,64}$/.test(t.id)) ? t.id : uid(), // ids validés : jamais d'injection dans les onclick
+    title: t.title,
+    note: (typeof t.note === "string") ? t.note : "",
+    cat: CATS.indexOf(t.cat) >= 0 ? t.cat : "urgent",
+    due: (typeof t.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.due)) ? t.due : null,
+    type: TYPES.indexOf(t.type) >= 0 ? t.type : "perso",
+    startT: validHM(t.startT),
+    endT: validHM(t.endT),
+    until: cleanUntil((typeof t.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.due)) ? t.due : null, t.until),
+    rep: cleanRep(t.rep, t.due),
+    gEventId: (typeof t.gEventId === "string" && t.gEventId && /^[\w.:-]{1,128}$/.test(t.gEventId)) ? t.gEventId : null,
+    autoImport: t.autoImport === true,
+    repChild: t.repChild === true,
+    gSync: (t.gSync === "pending" || t.gSync === "ok") ? t.gSync : null,
+    localEdit: t.localEdit === true,
+    evGone: t.evGone === true,
+    createdAt: t.createdAt || today(),
+    deferredFrom: t.deferredFrom || null,
+    doneAt: t.doneAt || null,
+    updatedAt: (typeof t.updatedAt === "number" && t.updatedAt > 0) ? t.updatedAt : null
+  };
+}
+function normalizeListIn(l) {
+  return {
+    id: (typeof l.id === "string" && /^[\w-]{1,64}$/.test(l.id)) ? l.id : uid(), // ids validés
+    name: l.name,
+    createdAt: l.createdAt || today(),
+    parent: (typeof l.parent === "string" && /^[\w-]{1,64}$/.test(l.parent)) ? l.parent : null,
+    template: l.template === true,
+    hideDone: l.hideDone === true,
+    updatedAt: (typeof l.updatedAt === "number" && l.updatedAt > 0) ? l.updatedAt : null,
+    items: (Array.isArray(l.items) ? l.items : []).filter(function (it) { return it && typeof it.text === "string"; }).map(function (it) {
+      return {
+        id: (typeof it.id === "string" && /^[\w-]{1,64}$/.test(it.id)) ? it.id : uid(), // ids validés
+        text: it.text,
+        done: it.done === true,
+        qty: (typeof it.qty === "number" && it.qty > 0 && it.qty < 1000) ? it.qty : null,
+        secret: it.secret === true
+      };
+    })
+  };
+}
+// v13 : les traces d'import de plus de 60 jours ne servent plus (fenêtre agenda ≤ 30 j) — purgées à l'import/restauration et à la fusion
+function purgeImportedEvents(map) {
+  var cut = Date.now() - 60 * 86400000;
+  var out = {};
+  Object.keys(map || {}).forEach(function (k) {
+    if (!map[k] || !map[k].at || map[k].at >= cut) out[k] = map[k];
+  });
+  return out;
+}
+function importJsonText(txt, opts) {
+  opts = opts || {};
+  var p = null;
+  try { p = JSON.parse(txt); } catch (e) { return false; }
+  if (!p || !Array.isArray(p.tasks)) return false;
+  var inSaved = p.savedAt || 0;
+  var curSaved = storedSavedAt();
+  if (!opts.force) {
+    if (inSaved < curSaved) return false;
+    if (inSaved === 0 && state.tasks.length > 0) return false;
+  }
+  // instantané de secours : l'état d'avant restauration reste récupérable
+  try { localStorage.setItem(KEY + "-secours", localStorage.getItem(KEY) || ""); } catch (e) {}
+  // v13 : les éléments locaux ABSENTS de la sauvegarde restaurée partent avec une pierre tombale —
+  // sinon l'autre appareil les renverrait à la fusion suivante (une restauration = décision explicite)
+  var keepIn = {};
+  (Array.isArray(p.tasks) ? p.tasks : []).forEach(function (t) { if (t && t.id) keepIn[t.id] = 1; });
+  (Array.isArray(p.lists) ? p.lists : []).forEach(function (l) { if (l && l.id) keepIn[l.id] = 1; });
+  state.tasks.forEach(function (t) { if (!keepIn[t.id]) addTombstone(t.id, "task"); });
+  state.lists.forEach(function (l) { if (!keepIn[l.id]) addTombstone(l.id, "list"); });
+  state.tasks = p.tasks.filter(function (t) { return t && typeof t.title === "string"; }).map(normalizeTaskIn);
+  state.lists = (Array.isArray(p.lists) ? p.lists : []).filter(function (l) { return l && typeof l.name === "string"; }).map(normalizeListIn);
+  state.autoAgenda = p.autoAgenda === true;
+  state.importedEvents = (p.importedEvents && typeof p.importedEvents === "object") ? p.importedEvents : {};
+  if (Array.isArray(p.tombstones)) {
+    var tb = {};
+    (state.tombstones || []).concat(p.tombstones).forEach(function (x) {
+      if (x && x.id && (!tb[x.id] || tb[x.id].at < (x.at || 0))) tb[x.id] = { id: x.id, kind: x.kind || "task", at: x.at || 0 };
+    });
+    state.tombstones = Object.keys(tb).map(function (k) { return tb[k]; });
+  }
+  // v13 : les éléments restaurés repartent avec un updatedAt TOUT NEUF — sinon la pierre tombale
+  // (plus récente que leur ancien updatedAt) les re-supprimait à la fusion suivante
+  var now13 = Date.now(), live13 = {};
+  state.tasks.concat(state.lists).forEach(function (x) { x.updatedAt = now13; live13[x.id] = 1; });
+  state.tombstones = (state.tombstones || []).filter(function (tb) { return !live13[tb.id]; }); // v13 : ressuscités → pierres tombales levées
+  state.importedEvents = purgeImportedEvents(state.importedEvents); // v13 : les traces de plus de 60 j ne s'accumulent plus
+  primeShadow(); // v12 : l'état importé devient la référence — pas de retamponnage fantôme
+  save();
+  return true;
+}
+// Fusion Drive → local (au démarrage) : AJOUTE ce qui manque ici sans rien écraser.
+// La sauvegarde auto renvoie ensuite l'ensemble fusionné vers Drive → les deux appareils se retrouvent.
+// ---------- Fusion Drive : suppression et modifications se propagent aussi ----------
+var driveMergedOk = false; // fusion réussie dans CETTE session : obligatoire avant tout envoi vers Drive
+function mergeRemote(data) {
+  var remoteTb = Array.isArray(data.tombstones) ? data.tombstones : [];
+  var added = 0, changed = 0, removed = 0; // v12 : TOUT changement compte, pas seulement les ajouts (déclaré AVANT les filtres)
+  // 1. éléments supprimés sur un autre appareil (pierre tombale plus récente que la dernière modif locale) → supprimés ici aussi
+  var deadR = {};
+  remoteTb.forEach(function (tb) { if (tb && tb.id) deadR[tb.id] = tb.at || 0; });
+  state.tasks = state.tasks.filter(function (t) { if (deadR[t.id] && (t.updatedAt || 0) <= deadR[t.id]) { removed++; return false; } return true; }); // v12 : suppressions distantes comptées
+  state.lists = state.lists.filter(function (l) { if (deadR[l.id] && (l.updatedAt || 0) <= deadR[l.id]) { removed++; return false; } return true; });
+  // 2. pierres tombales locales : ce qui a été supprimé ICI ne revient jamais
+  var deadL = {};
+  (state.tombstones || []).forEach(function (tb) { if (tb && tb.id) deadL[tb.id] = tb.at || 0; });
+  var byIdT = {}; state.tasks.forEach(function (t) { byIdT[t.id] = t; });
+  (Array.isArray(data.tasks) ? data.tasks : []).forEach(function (dt) {
+    if (!dt || typeof dt.title !== "string") return;
+    if (deadL[dt.id] && (dt.updatedAt || 0) <= deadL[dt.id]) return; // supprimé ici plus récemment
+    var cur = byIdT[dt.id];
+    if (!cur) { state.tasks.push(normalizeTaskIn(dt)); added++; }
+    else if ((dt.updatedAt || 0) > (cur.updatedAt || 0)) { state.tasks[state.tasks.indexOf(cur)] = normalizeTaskIn(dt); changed++; } // v12 : modif distante plus récente → remplacée (et comptée)
+  });
+  var byIdL = {}; state.lists.forEach(function (l) { byIdL[l.id] = l; });
+  (Array.isArray(data.lists) ? data.lists : []).forEach(function (dl) {
+    if (!dl || typeof dl.name !== "string") return;
+    if (deadL[dl.id] && (dl.updatedAt || 0) <= deadL[dl.id]) return;
+    var cur = byIdL[dl.id];
+    if (!cur) { state.lists.push(normalizeListIn(dl)); added++; }
+    else if ((dl.updatedAt || 0) > (cur.updatedAt || 0)) { state.lists[state.lists.indexOf(cur)] = normalizeListIn(dl); changed++; }
+  });
+  // 3. union des pierres tombales (la plus récente gagne) + purge au-delà de 60 jours
+  var tb = {};
+  (state.tombstones || []).concat(remoteTb).forEach(function (x) {
+    if (x && x.id && (!tb[x.id] || tb[x.id].at < (x.at || 0))) tb[x.id] = { id: x.id, kind: x.kind || "task", at: x.at || 0 };
+  });
+  var cutoff = Date.now() - 180 * 86400000; // v13 : 60 j laissaient un appareil hors ligne 2 mois ressusciter une tâche supprimée
+  state.tombstones = Object.keys(tb).map(function (k) { return tb[k]; }).filter(function (x) { return x.at >= cutoff; })
+    .sort(function (a, b) { return b.at - a.at; }).slice(0, 500); // v13 : plafond mémoire — les 500 plus récentes
+  return { added: added, changed: changed, removed: removed };
+}
+function driveMergeOnStart() {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.dCid || !cfg.dRefresh) return Promise.resolve(0);
+  var at = null;
+  return oauthToken(cfg.dCid, cfg.dSecret || "", cfg.dRefresh).then(function (tk) {
+    at = tk;
+    return driveEnsureFolder(at, driveFolderName());
+  }).then(function (fid) {
+    return driveFindFile(at, fid);
+  }).then(function (f) {
+    if (!f || !f.id) return null;
+    return agendaFetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(f.id) + "?alt=media", {
+      headers: { "Authorization": "Bearer " + at }
+    });
+  }).then(function (data) {
+    if (data && !Array.isArray(data.tasks)) { // v13 : fichier distant illisible → PAS de feu vert : on n'écrasera pas du bon avec du cassé
+      driveMergedOk = false;
+      setSyncError("drive", new Error("fichier Drive invalide"));
+      return 0;
+    }
+    driveMergedOk = true; // v13 : validé AVANT de l'annoncer (null = pas de fichier distant = on peut créer)
+    if (!data) return 0;
+    var m = mergeRemote(data);
+    var total = m.added + m.changed + m.removed; // v12 : modifs et suppressions de l'autre appareil comptent aussi
+    if (data.importedEvents && typeof data.importedEvents === "object") {
+      state.importedEvents = state.importedEvents || {};
+      Object.keys(data.importedEvents).forEach(function (k) {
+        if (!state.importedEvents[k]) state.importedEvents[k] = data.importedEvents[k];
+      });
+    }
+    state.importedEvents = purgeImportedEvents(state.importedEvents); // v13 : les traces d'import de plus de 60 j ne s'accumulent plus
+    // v12 : autoAgenda reste un réglage LOCAL — la fusion ne peut plus le réactiver toute seule
+    if (total > 0) {
+      primeShadow(); // v12 : les données reçues deviennent la référence — save() ne les retampone pas
+      save(); // persiste + relance une sauvegarde auto pour renvoyer la fusion sur Drive
+      renderAll();
+      showToast("☁️ Récupéré depuis Drive : " + m.added + " ajout(s), " + m.changed + " mise(s) à jour, " + m.removed + " suppression(s)");
+    }
+    if (total === 0 && _dirty) scheduleDriveBackup(); // v13 : local plus récent que Drive sans rien à fusionner → l'envoi part quand même
+    return total;
+  }).catch(function (e) {
+    driveMergedOk = false;
+    setSyncError("drive", e); // Drive injoignable / jeton refusé : la pastille le dit
+    return 0;
+  });
+}
+function doExport() {
+  try {
+    var blob = new Blob([JSON.stringify(exportData(), null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "taches-" + today() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+    showToast("💾 Export téléchargé");
+  } catch (e) { showToast("⚠️ Export impossible"); }
+}
+function handleImport(ev) {
+  var f = ev && ev.target && ev.target.files ? ev.target.files[0] : null;
+  if (!f) return;
+  try {
+    f.text().then(function (txt) {
+      var ok = importJsonText(txt);
+      if (!ok) {
+        // fichier plus ancien ou données locales plus récentes → on demande, on ne refuse pas en silence
+        var p = null;
+        try { p = JSON.parse(txt); } catch (e) {}
+        var nIn = (p && Array.isArray(p.tasks)) ? p.tasks.length : "?";
+        var msg = "Le fichier est plus ancien que tes données locales (" + state.tasks.length + " tâches ici, " + nIn + " dans le fichier).\nRemplacer quand même ? (un instantané de secours sera gardé)";
+        if (typeof confirm === "function" && confirm(msg)) ok = importJsonText(txt, { force: true });
+      }
+      renderAll();
+      showToast(ok ? "✅ Sauvegarde importée" : "⚠️ Import annulé (fichier invalide ou refusé)");
+    }).catch(function () { showToast("⚠️ Lecture impossible"); });
+  } catch (e) { showToast("⚠️ Lecture impossible"); }
+  if (ev && ev.target) ev.target.value = "";
+}
+
+// ---------- Agenda Google (lecture + écriture) ----------
+function findEvent(evId) {
+  var evs = (state.agendaCache && state.agendaCache.events) || [];
+  for (var i = 0; i < evs.length; i++) { if (evs[i].id === evId) return evs[i]; }
+  return null;
+}
+function parseEvents(data) {
+  var items = (data && Array.isArray(data.items)) ? data.items : [];
+  return items.map(function (it) {
+    var st = (it.start && (it.start.dateTime || it.start.date)) || "";
+    var en = (it.end && (it.end.dateTime || it.end.date)) || "";
+    var allDay = !(it.start && it.start.dateTime);
+    var day = allDay ? (it.start && it.start.date) || "" : st.slice(0, 10);
+    var until = null;
+    // événement sur plusieurs jours : journée entière → end.date-1 ; horodaté → jour de fin si l'heure de fin est après le début
+    if (allDay && /^\d{4}-\d{2}-\d{2}$/.test(en) && en > day) until = addDaysISO(en, -1);
+    if (!allDay && /^\d{4}-\d{2}-\d{2}/.test(en)) {
+      var endDay = en.slice(0, 10);
+      if (endDay > day && en.slice(11, 16) > "00:00") until = endDay; // v13 : 22:00→01:00 multi-jours OUI — 18:00→00:00 finit À minuit, pas de jour fantôme
+    }
+    return {
+      id: it.id || uid(),
+      title: it.summary || "(sans titre)",
+      color: (it.colorId !== undefined && it.colorId !== null) ? String(it.colorId) : null,
+      day: day,
+      until: until,
+      allDay: allDay,
+      startT: allDay ? "" : st.slice(11, 16),
+      endT: allDay ? "" : (en.slice(11, 16) || ""),
+      loc: (typeof it.location === "string") ? it.location : ""
+    };
+  }).filter(function (e) { return /^\d{4}-\d{2}-\d{2}$/.test(e.day); });
+}
+function agendaFetch(url, options) {
+  return fetch(url, options).then(function (r) {
+    return r.json().catch(function () { return null; }).then(function (j) {
+      // une erreur Google (403, 500, quota…) ne doit JAMAIS être lue comme « 0 événement »
+      if (!r.ok || (j && j.error)) {
+        // v12 : statut + message dans l'erreur — sinon « invalid_grant » (400 sans j.error.code) est invisible pour la pastille
+        var em = (j && j.error) ? ((typeof j.error === "string") ? j.error : String((j.error.message || j.error.code) || "")) : "";
+        throw new Error("api " + r.status + (em ? " " + em : ""));
+      }
+      return j;
+    });
+  });
+}
+// pagination : au-delà de 250 événements, Google découpe en pages (nextPageToken) → on veut TOUT
+function agendaFetchAll(url, options) {
+  var items = [];
+  function page(tok) {
+    var u = url + (tok ? "&pageToken=" + encodeURIComponent(tok) : "");
+    return agendaFetch(u, options).then(function (j) {
+      items = items.concat(j.items || []);
+      if (j.nextPageToken) return page(j.nextPageToken);
+      return items;
+    });
+  }
+  return page(null);
+}
+function agendaAccessToken(cfg) {
+  return oauthToken(cfg.cid, cfg.csec || "", cfg.refresh);
+}
+function oauthToken(cid, csec, refresh) {
+  var key = cid + "|" + refresh;
+  var cached = _tokCache[key];
+  if (cached && Date.now() < cached.exp) return Promise.resolve(cached.at); // le jeton dure ~1 h : pas de redemande à chaque opération
+  var body = "client_id=" + encodeURIComponent(cid)
+    + "&client_secret=" + encodeURIComponent(csec || "")
+    + "&refresh_token=" + encodeURIComponent(refresh)
+    + "&grant_type=refresh_token";
+  return agendaFetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body
+  }).then(function (tk) {
+    if (!tk || tk.error || !tk.access_token) throw new Error(tk && tk.error);
+    _tokCache[key] = { at: tk.access_token, exp: Date.now() + 50 * 60000 }; // mémorisé 50 min
+    return tk.access_token;
+  });
+}
+var _tokCache = {}; // cache des jetons d'accès (par paire client/refresh)
+function agendaRefresh(silent) {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.cid || !cfg.refresh) {
+    if (!silent) showToast("⚠️ Configure d'abord l'agenda");
+    return Promise.resolve(false);
+  }
+  return agendaAccessToken(cfg).then(function (at) {
+    var now = new Date();
+    var midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // minuit local : les événements déjà passés aujourd'hui restent visibles
+    var win = agendaWindowDays();
+    var end = new Date(midnight.getTime() + win * 86400000);
+    var tz = (typeof Intl !== "undefined" && Intl.DateTimeFormat) ? (Intl.DateTimeFormat().resolvedOptions().timeZone || "") : "";
+    var url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+      + "?timeMin=" + encodeURIComponent(midnight.toISOString())
+      + "&timeMax=" + encodeURIComponent(end.toISOString())
+      + "&singleEvents=true&orderBy=startTime&maxResults=250"
+      + (tz ? "&timeZone=" + encodeURIComponent(tz) : "");
+    return agendaFetchAll(url, { headers: { "Authorization": "Bearer " + at } });
+  }).then(function (items) {
+    state.agendaCache = { fetchedAt: Date.now(), events: parseEvents({ items: items }) };
+    clearSyncError("agenda"); // synchro agenda réussie : la pastille redevient verte si elle était orange
+    var nImp = 0, sync = null;
+    if (state.autoAgenda) {
+      nImp = autoImportAll().n; // v13 : les occurrences de séries ne sont plus importées en masse
+      sync = syncImportedFromCache();
+    }
+    persist();
+    renderAll();
+    retryPendingSync();
+    if (!silent) {
+      var msg = "📅 Agenda à jour — " + state.agendaCache.events.length + " événement(s) sur " + agendaWindowDays() + " jours";
+      if (nImp > 0) msg += " · " + nImp + " tâche(s) importée(s)";
+      if (sync && sync.nUpd > 0) msg += " · " + sync.nUpd + " mise(s) à jour";
+      if (sync && sync.nGone > 0) msg += " · " + sync.nGone + " événement(s) disparu(s)";
+      showToast(msg);
+    }
+    return true;
+  }).catch(function (e) {
+    setSyncError("agenda", e); // pastille : 🟠 échec réseau/quota, 🔴 jeton refusé (invalid_grant)
+    if (!silent) showToast("⚠️ Agenda indisponible — vérifie la configuration");
+    return false;
+  });
+}
+// Import auto agenda → tâches : chaque événement non encore importé devient une tâche (sans doublon)
+function autoImportAll() {
+  var evs = (state.agendaCache && state.agendaCache.events) || [];
+  var n = 0, skip = 0;
+  evs.forEach(function (e) {
+    if (String(e.id).indexOf("_") >= 0) { skip++; return; } // v13 : l'import AUTO saute les occurrences d'une série (une série quotidienne = jusqu'à 30 tâches d'un coup) — le ＋ de chaque ligne reste possible
+    if (importEventAsTask(e, true)) n++;
+  });
+  return { n: n, skip: skip };
+}
+function toggleAutoAgenda() {
+  state.autoAgenda = !state.autoAgenda;
+  var n = 0;
+  if (state.autoAgenda && state.agendaCache) {
+    n = autoImportAll().n; // v13 : idem
+    syncImportedFromCache();
+  }
+  persist();
+  renderAll();
+  showToast(state.autoAgenda
+    ? "📥 Import auto agenda → tâches : ACTIVÉ" + (n > 0 ? " (" + n + " tâche(s) importée(s))" : "")
+    : "📥 Import auto agenda → tâches : désactivé");
+  if (state.autoAgenda && state.cfg && state.cfg.cid && state.cfg.refresh) agendaRefresh(true);
+}
+function importAllNow() {
+  if (!state.agendaCache || !state.agendaCache.events || state.agendaCache.events.length === 0) {
+    showToast("⚠️ Actualise d'abord l'agenda (🔄)");
+    return;
+  }
+  var r13 = autoImportAll();
+  var n = r13.n;
+  save();
+  renderAll();
+  if (n > 0) { showToast("📥 " + n + " événement(s) transformé(s) en tâche(s)" + (r13.skip > 0 ? " · " + r13.skip + " occurrence(s) de séries ignorée(s)" : "")); return; }
+  // v10.1 : le refus est expliqué — traces d'imports de tâches supprimées vs événements réellement liés
+  var ghosts = state.agendaCache.events.filter(function (e) {
+    return state.importedEvents[e.id] && !evOwnerTask(e);
+  }).length;
+  showToast(ghosts > 0
+    ? "⚠️ Rien de nouveau : " + ghosts + " événement(s) converti(s) puis supprimé(s) — ré-ajoutables un par un via ＋"
+    : "⚠️ Tout est déjà importé");
+}
+// Actualisation silencieuse si l'agenda n'a pas été rafraîchi depuis plus de 15 min (max 1 essai/min)
+var lastAutoFetch = 0;
+function maybeAutoRefresh() {
+  if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) return;
+  var last = (state.agendaCache && state.agendaCache.fetchedAt) || 0;
+  if (Date.now() - last > 15 * 60000 && Date.now() - lastAutoFetch > 60000) {
+    lastAutoFetch = Date.now();
+    agendaRefresh(true);
+  }
+}
+function saveAgendaDays(v) {
+  var d = parseInt(v, 10);
+  if (d !== 7 && d !== 14 && d !== 30) d = 30;
+  state.cfg = Object.assign({}, state.cfg || {}, { agendaDays: d });
+  persist();
+  renderAll();
+  showToast("📅 Fenêtre agenda : " + d + " jours");
+  if (state.cfg && state.cfg.cid && state.cfg.refresh) agendaRefresh(true);
+}
+// Écrire dans l'agenda : événement horodaté ou journée entière, avec répétition (RRULE).
+// Si la tâche a déjà un gEventId : l'événement est MIS À JOUR (plus de doublon). Sinon il est créé.
+function taskEventBody(t) {
+  var tz = deviceTz();
+  var multi = t.until && t.until !== t.due;
+  var lastDay = multi ? t.until : t.due;
+  var ev = {
+    summary: (t.type === "pro" ? "🔴 " : "🔵 ") + t.title,
+    description: ((t.note || "") ? t.note + "\n" : "") + "(" + (t.type === "pro" ? "professionnel" : "personnel") + " — via Tâches & Relances)",
+    colorId: (t.type === "pro") ? "11" : "9"
+  };
+  if (t.startT) {
+    ev.start = { dateTime: t.due + "T" + t.startT + ":00", timeZone: tz };
+    var endDay = multi ? t.until : t.due;
+    var endHM, plusDays = 0;
+    if (t.endT && t.endT > t.startT) { endHM = t.endT; }
+    else { var hp = hmPlus(t.startT, 60); endHM = hp.hm; plusDays = hp.plusDays; }
+    ev.end = { dateTime: addDaysISO(endDay, plusDays) + "T" + endHM + ":00", timeZone: tz };
+  } else {
+    ev.start = { date: t.due };
+    ev.end = { date: addDaysISO(lastDay, 1) };
+  }
+  var rule = repToRule(t.rep);
+  if (rule) ev.recurrence = [rule];
+  return ev;
+}
+function taskToEvent(id) {
+  var t = getTask(id);
+  if (!t) return Promise.resolve(false);
+  if (!t.due) { showToast("⚠️ Donne d'abord une échéance à la tâche"); return Promise.resolve(false); }
+  var cfg = state.cfg;
+  if (!cfg || !cfg.cid || !cfg.refresh) { showToast("⚠️ Connecte d'abord l'agenda (bouton 📅 en haut)"); return Promise.resolve(false); }
+  if (t.autoImport) { showToast("ℹ️ Tâche venue de l'agenda — modifie-la dans Google Agenda pour la changer"); return Promise.resolve(false); }
+  if (t.repChild) { showToast("ℹ️ Occurrence d'une série — elle existe déjà dans l'agenda (modifie la série dans Google Agenda)"); return Promise.resolve(false); } // v13 : le clone gardait « rep » → un « Enregistrer (+📅) » créait une 2e SÉRIE Google
+  var ev = taskEventBody(t);
+  var wasUpdate = false;
+  return agendaAccessToken(cfg).then(function (at) {
+    var upd = !!(t.gEventId && String(t.gEventId).indexOf("_") < 0); // les id d'instances récurrentes contiennent "_"
+    wasUpdate = upd;
+    if (!upd) ev.id = clientEventId(t.id); // id déterministe dérivé de la tâche : un renvoi ne crée jamais de doublon
+    var url = "https://www.googleapis.com/calendar/v3/calendars/primary/events" + (upd ? "/" + encodeURIComponent(t.gEventId) : "");
+    var headers = { "Authorization": "Bearer " + at, "Content-Type": "application/json" };
+    return fetch(url, { method: upd ? "PUT" : "POST", headers: headers, body: JSON.stringify(ev) })
+      .then(function (r) {
+        // événement supprimé côté Google → on le recrée (même id dérivé : impossible de doubler)
+        if (upd && (r.status === 404 || r.status === 410)) {
+          wasUpdate = false;
+          ev.id = clientEventId(t.id);
+          return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", { method: "POST", headers: headers, body: JSON.stringify(ev) });
+        }
+        return r;
+      })
+      .then(function (r) {
+        if (!upd && r.status === 409) {
+          // v13 : id déjà pris = événement supprimé/corbeille côté Google — l'ancien « 409 = succès » laissait la tâche
+          // avec un « 📅 agenda ✓ » mensonger SANS événement. On tente la résurrection (PUT status confirmed) ;
+          // si Google la refuse, un id dérivé suffixé recrée l'événement proprement.
+          wasUpdate = true;
+          return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(ev.id), {
+            method: "PUT", headers: headers,
+            body: JSON.stringify(Object.assign({}, ev, { status: "confirmed" }))
+          }).then(function (r2) {
+            if (r2.status === 404 || r2.status === 410) {
+              wasUpdate = false;
+              ev.id = String(String(clientEventId(t.id)) + "x2").slice(0, 100);
+              return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", { method: "POST", headers: headers, body: JSON.stringify(ev) });
+            }
+            return r2;
+          });
+        }
+        return r;
+      })
+      .then(function (r) {
+        return r.json().catch(function () { return null; });
+      });
+  }).then(function (created) {
+    if (!created || created.error) throw new Error("écriture refusée");
+    t.gEventId = created.id;
+    t.gSync = "ok";
+    t.gSyncedAt = Date.now();
+    save();
+    showToast("📅 Événement « " + t.title + " » " + (wasUpdate ? "mis à jour" : "créé") + " dans l'agenda — " + fmtDate(t.due)
+      + (t.until && t.until !== t.due ? " → " + fmtDate(t.until) : "")
+      + (t.rep ? " (" + repLabel(t.rep) + ")" : "") + (t.startT ? " " + t.startT + (t.endT ? "–" + t.endT : "") : ""));
+    return true;
+  }).catch(function () {
+    // hors-ligne ou erreur : la tâche est marquée « à synchroniser » et repartira automatiquement
+    t.gSync = "pending";
+    save();
+    showToast("⚠️ Impossible d'écrire dans l'agenda — 🔄 tâche marquée « à synchroniser », reprise auto plus tard");
+    return false;
+  });
+}
+// Supprimer l'événement Google lié (quand on supprime une tâche qui l'avait créé)
+function agendaDeleteEvent(evId, title, silent) {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.cid || !cfg.refresh || !evId) return Promise.resolve(false);
+  if (String(evId).indexOf("_") >= 0) return Promise.resolve(false); // instance récurrente : on n'y touche pas
+  return agendaAccessToken(cfg).then(function (at) {
+    return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(evId), {
+      method: "DELETE",
+      headers: { "Authorization": "Bearer " + at }
+    });
+  }).then(function (r) {
+    if (r.status !== 200 && r.status !== 204) throw new Error("delete refusé");
+    state.pendingEventDeletes = (state.pendingEventDeletes || []).filter(function (e) { return e !== evId; });
+    persist();
+    if (!silent) showToast("🗑️ Événement retiré de l'agenda" + (title ? " : « " + title + " »" : ""));
+    return true;
+  }).catch(function () {
+    state.pendingEventDeletes = state.pendingEventDeletes || [];
+    if (state.pendingEventDeletes.indexOf(evId) < 0) state.pendingEventDeletes.push(evId);
+    persist();
+    if (!silent) showToast("⚠️ L'événement n'a pas pu être retiré de l'agenda — 🔄 reprise auto plus tard");
+    return false;
+  });
+}
+// Reprise automatique : tâches en attente d'envoi agenda + événements à supprimer
+// id d'événement Google dérivé de la tâche : un même POST ne peut JAMAIS créer deux événements
+// (base32hex exigé par Google : a-v et 0-9, 5 à 1024 caractères)
+function clientEventId(taskId) {
+  var raw = String(taskId || "").toLowerCase().replace(/[^a-v0-9]/g, "");
+  return ("evt" + raw).slice(0, 100);
+}
+function retryPendingSync() {
+  if (syncBusy) return; // une reprise est déjà en cours : pas de double envoi
+  var cfg = state.cfg;
+  if (!cfg || !cfg.cid || !cfg.refresh) return;
+  var pend = state.tasks.filter(function (t) { return t.gSync === "pending" && t.due && !t.autoImport && !syncInFlight[t.id]; });
+  var dels = (state.pendingEventDeletes || []).slice();
+  if (pend.length === 0 && dels.length === 0) return;
+  syncBusy = true;
+  pend.forEach(function (t) { syncInFlight[t.id] = true; });
+  Promise.all(pend.map(function (t) {
+    return Promise.resolve(taskToEvent(t.id)).then(function () { delete syncInFlight[t.id]; },
+      function () { delete syncInFlight[t.id]; });
+  })).then(function () {
+    dels.forEach(function (eid) { agendaDeleteEvent(eid, null, true); });
+    syncBusy = false;
+  }, function () { syncBusy = false; });
+}
+var syncBusy = false;       // reprise globale en cours (anti-double déclenchement : lancement, agenda, premier plan…)
+var syncInFlight = {};     // tâches dont l'événement est en cours d'envoi
+
+// ---------- Sauvegarde Google Drive (dossier taffbmpm) ----------
+function driveFolderName() {
+  var cfg = state.cfg || {};
+  return (cfg.dFolder && String(cfg.dFolder).trim()) || DRIVE_DEFAULT_FOLDER;
+}
+function driveBackupNow(silent) {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.dCid || !cfg.dRefresh) { if (!silent) showToast("⚠️ Configure d'abord la sauvegarde Drive"); return Promise.resolve(false); }
+  var doSend = function () {
+    var folderName = driveFolderName();
+    var seq0 = _saveSeq; // v13 : un changement survenu PENDANT l'envoi ne doit pas rester non envoyé
+    var at = null, folderId = null, fileId = null;
+    return oauthToken(cfg.dCid, cfg.dSecret || "", cfg.dRefresh).then(function (tk) {
+      at = tk;
+      return driveEnsureFolder(at, folderName);
+    }).then(function (fid) {
+      folderId = fid;
+      return driveFindFile(at, fid);
+    }).then(function (existing) {
+      fileId = (existing && existing.id) ? existing.id : null;
+      if (!fileId) return null; // pas de fichier distant → rien à relire, on le crée
+      // v13 : pull-before-push (P0) — on RELIT le distant juste avant d'écrire : ce que l'autre
+      // appareil a changé entre notre fusion et maintenant n'est plus écrasé
+      return agendaFetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId) + "?alt=media", {
+        headers: { "Authorization": "Bearer " + at }
+      });
+    }).then(function (remote) {
+      if (remote) {
+        if (!remote || !Array.isArray(remote.tasks)) throw new Error("fichier Drive invalide"); // v13 : JAMAIS d'écrasement d'un fichier illisible
+        var m = mergeRemote(remote);
+        var tot = m.added + m.changed + m.removed;
+        if (tot > 0) { primeShadow(); persist(); renderAll(); } // v13 : fusionné AVANT de sérialiser ce qu'on envoie
+      }
+      var content = JSON.stringify(exportData(), null, 2);
+      if (fileId) return driveUpdateFile(at, fileId, content).then(function () { return "mis à jour"; });
+      return driveCreateFile(at, folderId, content).then(function () { return "créé"; });
+    }).then(function (res) {
+      state.driveSyncedAt = Date.now();
+      _dirty = _saveSeq > seq0; // v13 : des modifs sont survenues pendant l'envoi → on repart tout de suite
+      if (_dirty) scheduleDriveBackup();
+      clearSyncError("drive"); // sauvegarde Drive réussie : pastille réparée
+      persist();
+      if (!silent) showToast("☁️ Sauvegardé sur Drive — « " + DRIVE_FILE_NAME + " » dans " + folderName + " (" + res + ")");
+      return true;
+    });
+  };
+  // jamais d'écrasement Drive sans fusion préalable réussie (sinon un appareil à jour vide écraserait tout)
+  if (driveMergedOk) return doSend().catch(function (e) {
+    setSyncError("drive", e);
+    if (!silent) showToast("⚠️ Sauvegarde Drive impossible — vérifie la configuration");
+    return false;
+  });
+  return driveMergeOnStart().then(function () {
+    if (!driveMergedOk) {
+      if (!silent) showToast("⚠️ Fusion Drive impossible — sauvegarde annulée, rien n'a été écrasé");
+      return false;
+    }
+    return doSend().catch(function (e) {
+      setSyncError("drive", e);
+      if (!silent) showToast("⚠️ Sauvegarde Drive impossible — vérifie la configuration");
+      return false;
+    });
+  });
+}
+function toggleAutoBackup() {
+  state.autoBackup = state.autoBackup === false ? true : false;
+  persist();
+  renderAll();
+  showToast(state.autoBackup ? "☁️ Sauvegarde Drive auto : ✅ ON" : "☁️ Sauvegarde Drive auto : ❌ OFF");
+  if (state.autoBackup) scheduleDriveBackup();
+}
+function driveRestoreNow() {
+  var cfg = state.cfg;
+  if (!cfg || !cfg.dCid || !cfg.dRefresh) { showToast("⚠️ Configure d'abord la sauvegarde Drive"); return Promise.resolve(false); }
+  if (typeof confirm === "function" && !confirm("Restaurer la sauvegarde Drive ?\nTes données actuelles seront REMPLACÉES (un instantané de secours local est gardé).")) { showToast("Restauration annulée"); return Promise.resolve(false); } // v12 : jamais sans confirmation
+  var folderName = driveFolderName();
+  var at = null;
+  return oauthToken(cfg.dCid, cfg.dSecret || "", cfg.dRefresh).then(function (tk) {
+    at = tk;
+    return driveEnsureFolder(at, folderName);
+  }).then(function (fid) {
+    return driveFindFile(at, fid);
+  }).then(function (f) {
+    if (!f || !f.id) { showToast("⚠️ Aucune sauvegarde trouvée sur Drive"); return null; }
+    return agendaFetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(f.id) + "?alt=media", {
+      headers: { "Authorization": "Bearer " + at }
+    });
+  }).then(function (data) {
+    if (!data) return false;
+    var ok = importJsonText(JSON.stringify(data), { force: true }); // restauration explicite : l'ancien garde-fou savedAt refusait presque toujours
+    renderAll();
+    showToast(ok ? "✅ Sauvegarde Drive restaurée (un instantané de secours local a été gardé)" : "⚠️ Contenu Drive invalide");
+    return ok;
+  }).catch(function () {
+    showToast("⚠️ Restauration Drive impossible — vérifie la configuration");
+    return false;
+  });
+}
+// v12 : restauration de l'instantané de secours local (état d'avant la dernière importation/restauration Drive)
+function restoreSecours() {
+  if (typeof confirm === "function" && !confirm("Restaurer l'instantané de secours local (état d'avant la dernière importation/restauration) ?")) { showToast("Restauration annulée"); return; }
+  try {
+    var txt = localStorage.getItem(KEY + "-secours");
+    if (!txt) { showToast("⚠️ Aucun instantané de secours sur cet appareil"); return; }
+    var ok = importJsonText(txt, { force: true });
+    renderAll();
+    showToast(ok ? "✅ Instantané de secours restauré" : "⚠️ Instantané de secours invalide");
+  } catch (e) { showToast("⚠️ Restauration impossible"); }
+}
+function driveEnsureFolder(at, name) {
+  var q = "mimeType = 'application/vnd.google-apps.folder' and name = '" + name.replace(/'/g, "\\'") + "' and trashed = false";
+  var url = "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(q) + "&fields=files(id,name)&pageSize=5";
+  return agendaFetch(url, { headers: { "Authorization": "Bearer " + at } }).then(function (data) {
+    var files = (data && Array.isArray(data.files)) ? data.files : [];
+    for (var i = 0; i < files.length; i++) {
+      if (files[i].name === name) return files[i].id;
+    }
+    return agendaFetch("https://www.googleapis.com/drive/v3/files", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name, mimeType: "application/vnd.google-apps.folder" })
+    }).then(function (f) {
+      if (!f || f.error || !f.id) throw new Error("dossier refusé");
+      return f.id;
+    });
+  });
+}
+function driveFindFile(at, folderId) {
+  var q = "name = '" + DRIVE_FILE_NAME + "' and '" + folderId + "' in parents and trashed = false";
+  var url = "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(q) + "&fields=files(id,name)&pageSize=5";
+  return agendaFetch(url, { headers: { "Authorization": "Bearer " + at } }).then(function (data) {
+    var files = (data && Array.isArray(data.files)) ? data.files : [];
+    return files.length > 0 ? files[0] : null;
+  });
+}
+function driveCreateFile(at, folderId, content) {
+  var boundary = "TRB" + Date.now().toString(36);
+  var meta = JSON.stringify({ name: DRIVE_FILE_NAME, parents: [folderId], mimeType: "application/json" });
+  var body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n"
+    + meta + "\r\n--" + boundary + "\r\nContent-Type: application/json\r\n\r\n"
+    + content + "\r\n--" + boundary + "--";
+  return agendaFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + at,
+      "Content-Type": "multipart/related; boundary=" + boundary
+    },
+    body: body
+  }).then(function (f) {
+    if (!f || f.error || !f.id) throw new Error("upload refusé");
+    return f;
+  });
+}
+function driveUpdateFile(at, fileId, content) {
+  return agendaFetch("https://www.googleapis.com/upload/drive/v3/files/" + encodeURIComponent(fileId) + "?uploadType=media", {
+    method: "PATCH",
+    headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" },
+    body: content
+  }).then(function (f) {
+    if (!f || f.error || !f.id) throw new Error("mise à jour refusée");
+    return f;
+  });
+}
+function saveAgendaCfg() {
+  var cid = (document.getElementById("aCid").value || "").trim();
+  var csec = (document.getElementById("aSecret").value || "").trim();
+  var refresh = (document.getElementById("aRefresh").value || "").trim();
+  if (!cid || !refresh) { showToast("⚠️ Client ID et Refresh Token obligatoires"); return false; }
+  state.cfg = Object.assign({}, state.cfg || {}, { cid: cid, csec: csec, refresh: refresh });
+  save();
+  return true;
+}
+
+// ---------- Configuration Drive (sauvegarde taffbmpm) ----------
+function driveCfgOk() {
+  var cfg = state.cfg || {};
+  return !!(cfg.dCid && cfg.dRefresh);
+}
+function driveSaveCfg() {
+  var cid = (document.getElementById("dCid").value || "").trim();
+  var csec = (document.getElementById("dSecret").value || "").trim();
+  var refresh = (document.getElementById("dRefresh").value || "").trim();
+  var folder = (document.getElementById("dFolder").value || "").trim();
+  if (!cid || !refresh) { showToast("⚠️ Client ID et Refresh Token Drive obligatoires"); return false; }
+  state.cfg = Object.assign({}, state.cfg || {}, {
+    dCid: cid, dSecret: csec, dRefresh: refresh,
+    dFolder: folder || DRIVE_DEFAULT_FOLDER
+  });
+  save();
+  renderAll();
+  showToast("💾 Sauvegarde Drive configurée — dossier " + driveFolderName());
+  driveMergeOnStart().then(function () { retryPendingSync(); });
+  scheduleDriveBackup();
+  return true;
+}
+function driveDisconnect() {
+  if (state.cfg) {
+    state.cfg = Object.assign({}, state.cfg, { dCid: null, dSecret: null, dRefresh: null, dFolder: null });
+  }
+  save();
+  renderAll();
+  showToast("🔌 Sauvegarde Drive déconnectée");
+}
+function agendaDisconnect() {
+  if (state.cfg) state.cfg = Object.assign({}, state.cfg, { cid: null, csec: null, refresh: null });
+  state.agendaCache = null;
+  save();
+  renderAll();
+  showToast("🔌 Agenda déconnecté");
+}
+// note reconstruite depuis un événement (heures + lieu) — sert à l'import et à la mise à jour
+function buildEvNote(ev) {
+  var note = "";
+  if (!ev.allDay && (ev.startT || ev.endT)) note = "🕒 " + ev.startT + (ev.endT ? "–" + ev.endT : "");
+  if (ev.until && ev.until !== ev.day) note += (note ? " · " : "") + "jusqu'au " + fmtDate(ev.until);
+  if (ev.loc) note += (note ? " · " : "") + "📍 " + ev.loc;
+  return note;
+}
+// tâche de l'app possédant cet événement (id exact, récurrence d'origine ou instance « base_date »)
+function evOwnerTask(ev) {
+  var base = String(ev.id).split("_")[0];
+  for (var i = 0; i < state.tasks.length; i++) {
+    var t = state.tasks[i];
+    if (!t.gEventId) continue;
+    if (t.gEventId === ev.id) return t;
+    // v12 : la comparaison par base ne concerne QUE les tâches créées dans l'app —
+    // une instance importée ne « possède » plus les occurrences suivantes de la série
+    if (!t.autoImport && String(t.gEventId).split("_")[0] === base) return t;
+  }
+  return null;
+}
+// Importer un événement de l'agenda en tâche — dédoublonné via importedEvents
+// v10.1 : une trace d'import dont la tâche a été supprimée ne bloque plus le bouton ＋ (force)
+// — l'import AUTO reste bloqué (une suppression ne doit pas ressusciter toute seule via Drive)
+function importEventAsTask(ev, silent, force) {
+  if (!ev || !ev.day || !/^\d{4}-\d{2}-\d{2}$/.test(ev.day)) return null;
+  state.importedEvents = state.importedEvents || {};
+  if (state.importedEvents[ev.id] && !force) return null;
+  // anti-doublon : une tâche de l'app ayant déjà cet événement (ou l'événement récurrent d'origine) → jamais de 2e tâche
+  var owned = evOwnerTask(ev);
+  if (owned) {
+    state.importedEvents[ev.id] = { taskId: null, title: ev.title, day: ev.day, at: Date.now() };
+    save();
+    return null;
+  }
+  var title = stripEvTitle(ev.title);
+  var type = (ev.color === "11") ? "pro" : "perso";
+  var td = today();
+  var cat = (ev.day <= td) ? "urgent" : "week";
+  // v12 : id déterministe dérivé de l'événement — deux appareils qui importent le même
+  // événement créent la MÊME tâche : la fusion Drive les dédoublonne d'elle même
+  var impId = "ev-" + String(ev.id).replace(/[^\w-]/g, "").slice(0, 61);
+  var already = /^[\w-]{1,64}$/.test(impId) ? getTask(impId) : null;
+  if (already) { // import forcé mais tâche déjà là sous cet id : on ne duplique pas
+    state.importedEvents[ev.id] = { taskId: already.id, title: already.title, day: ev.day, at: Date.now() };
+    save();
+    return null;
+  }
+  var t = addTask(title, buildEvNote(ev), cat, ev.day, type, {
+    id: /^[\w-]{1,64}$/.test(impId) ? impId : null,
+    startT: ev.allDay ? null : validHM(ev.startT),
+    endT: ev.allDay ? null : validHM(ev.endT),
+    until: ev.until,
+    gEventId: ev.id,
+    autoImport: true
+  });
+  state.importedEvents[ev.id] = { taskId: t.id, title: t.title, day: ev.day, at: Date.now() };
+  save();
+  return t;
+}
+// Synchro retour Google → tâches : met à jour les tâches importées dont l'événement a bougé,
+// marque celles dont l'événement a disparu. Ne touche jamais aux tâches que tu as modifiées (localEdit) ni aux terminées.
+function syncImportedFromCache() {
+  var evs = (state.agendaCache && state.agendaCache.events) || [];
+  var byId = {};
+  evs.forEach(function (e) { byId[e.id] = e; });
+  var horizon = addDaysISO(today(), agendaWindowDays());
+  var nUpd = 0, nGone = 0;
+  Object.keys(state.importedEvents || {}).forEach(function (evId) {
+    var rec = state.importedEvents[evId];
+    var t = getTask(rec.taskId);
+    if (!t) return; // tâche supprimée localement : on garde la trace pour ne pas la réimporter
+    var ev = byId[evId];
+    if (ev) {
+      if (t.evGone) { t.evGone = false; nUpd++; }
+      if (t.localEdit || t.cat === "done") return; // tes modifs priment ; les terminées ne bougent plus
+      var changed = false;
+      var newTitle = stripEvTitle(ev.title);
+      if (newTitle !== t.title) { t.title = newTitle; changed = true; }
+      if (ev.day !== t.due) { t.due = ev.day; changed = true; }
+      if ((ev.until || null) !== (t.until || null)) { t.until = ev.until || null; changed = true; }
+      if (!ev.allDay) {
+        var ns = validHM(ev.startT), ne = validHM(ev.endT);
+        if (ns !== t.startT) { t.startT = ns; changed = true; }
+        if (ne !== t.endT) { t.endT = ne; changed = true; }
+      } else if (t.startT || t.endT) { t.startT = null; t.endT = null; changed = true; }
+      var newNote = buildEvNote(ev);
+      if (newNote !== (t.note || "")) { t.note = newNote; changed = true; }
+      if (changed) nUpd++;
+    } else if (t.due && t.due >= today() && t.due <= horizon && t.cat !== "done") { // v12 : un événement PASSÉ absent du cache (fenêtre = futur) n'est PAS « disparu »
+      if (!t.evGone) { t.evGone = true; nGone++; }
+    }
+  });
+  if (nUpd > 0 || nGone > 0) persist();
+  return { nUpd: nUpd, nGone: nGone };
+}
+function eventToTask(evId) {
+  var ev = findEvent(evId);
+  if (!ev) return false;
+  var t = importEventAsTask(ev, false, true); // ＋ manuel : une ancienne trace d'import (tâche supprimée depuis) ne bloque plus
+  renderAll();
+  if (t) showToast("✅ Tâche créée : " + t.title);
+  else {
+    var own = evOwnerTask(ev); // le refus vient forcément d'une tâche existante : disons laquelle
+    showToast(own && own.cat === "done"
+      ? "⚠️ Déjà dans tes tâches — rangée dans « Terminé »"
+      : "⚠️ Cet événement est déjà dans tes tâches");
+  }
+  return !!t;
+}
+
+// ---------- Modifier un événement depuis l'app (PATCH Google Agenda) ----------
+var editEvId = null;
+function openEvModal(evId) {
+  var ev = findEvent(evId);
+  if (!ev) return;
+  if (String(ev.id).indexOf("_") >= 0) {
+    showToast("⚠️ Occurrence d'un événement répété — modifie l'événement d'origine dans Google Agenda");
+    return;
+  }
+  editEvId = evId;
+  document.getElementById("eLabel").textContent = "Modifier l'événement";
+  document.getElementById("eTitle").value = stripEvTitle(ev.title);
+  document.getElementById("eDay").value = ev.day;
+  document.getElementById("eUntil").value = (ev.until && ev.until !== ev.day) ? ev.until : "";
+  document.getElementById("eStart").value = ev.allDay ? "" : (ev.startT || "");
+  document.getElementById("eEnd").value = ev.allDay ? "" : (ev.endT || "");
+  document.getElementById("eLoc").value = ev.loc || "";
+  document.getElementById("evModal").className = "modal";
+}
+function closeEvModal() {
+  document.getElementById("evModal").className = "modal hidden";
+  editEvId = null;
+}
+function agendaSaveEvent() {
+  var ev = findEvent(editEvId);
+  if (!ev) { closeEvModal(); return false; }
+  var title = ((document.getElementById("eTitle") || {}).value || "").trim();
+  if (!title) { showToast("⚠️ Donne un titre à l'événement"); return null; }
+  var day = ((document.getElementById("eDay") || {}).value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) { showToast("⚠️ Donne une date de début"); return null; }
+  var until = ((document.getElementById("eUntil") || {}).value || "").trim() || null;
+  if (until && until < day) { showToast("⚠️ « Jusqu'au » doit être après la date de début"); return null; }
+  var startT = validHM(((document.getElementById("eStart") || {}).value || "").trim());
+  var endT = validHM(((document.getElementById("eEnd") || {}).value || "").trim());
+  if (startT && endT && endT <= startT) { showToast("⚠️ L'heure de fin doit être après l'heure de début"); return null; }
+  var loc = ((document.getElementById("eLoc") || {}).value || "").trim();
+  var cfg = state.cfg;
+  if (!cfg || !cfg.cid || !cfg.refresh) { showToast("⚠️ Connecte d'abord l'agenda"); return null; }
+  var tz = deviceTz();
+  var multi = !!(until && until !== day);
+  var body = {
+    summary: ((ev.color === "11") ? "🔴 " : ((ev.color === "9") ? "🔵 " : "")) + title,
+    location: loc || ""
+  };
+  if (startT) {
+    body.start = { dateTime: day + "T" + startT + ":00", timeZone: tz };
+    var endDay = multi ? until : day;
+    var endHM, plusDays = 0;
+    if (endT) { endHM = endT; }
+    else { var hp = hmPlus(startT, 60); endHM = hp.hm; plusDays = hp.plusDays; }
+    body.end = { dateTime: addDaysISO(endDay, plusDays) + "T" + endHM + ":00", timeZone: tz };
+  } else {
+    body.start = { date: day };
+    body.end = { date: addDaysISO(multi ? until : day, 1) };
+  }
+  var idBefore = ev.id;
+  return agendaAccessToken(cfg).then(function (at) {
+    return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(idBefore), {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+  }).then(function (r) {
+    return r.json().then(function (j) {
+      if (!r.ok || !j || j.error) throw new Error("patch refusé");
+      return j;
+    });
+  }).then(function () {
+    // mise à jour du cache local (pas besoin de re-télécharger)
+    ev.title = body.summary;
+    ev.day = day;
+    ev.until = multi ? until : null;
+    ev.allDay = !startT;
+    ev.startT = startT || "";
+    ev.endT = endT || "";
+    ev.loc = loc;
+    state.agendaCache.events.sort(function (a, b) {
+      if (a.day !== b.day) return (a.day < b.day) ? -1 : 1;
+      return ((a.startT || "99:99") <= (b.startT || "99:99")) ? -1 : 1;
+    });
+    persist();
+    closeEvModal();
+    var sync = syncImportedFromCache(); // la tâche importée liée suit immédiatement
+    renderAll();
+    showToast("✅ Événement modifié dans Google Agenda" + ((sync && sync.nUpd > 0) ? " — tâche liée mise à jour" : ""));
+    return true;
+  }).catch(function () {
+    showToast("⚠️ Modification impossible — vérifie la connexion et réessaie");
+    return false;
+  });
+}
+
+// ---------- Rendu ----------
+function renderTabs() {
+  var c = counts();
+  var html = "";
+  TABS.forEach(function (k) {
+    html += '<button class="tab ' + (tab === k ? "active " + k : "") + '" role="tab" aria-selected="' + (tab === k ? "true" : "false") + '" onclick="setTab(\'' + k + '\')">'
+      + CAT_LABELS[k] + '<span class="n">' + c[k] + "</span></button>";
+  });
+  document.getElementById("tabbar").innerHTML = html;
+}
+function taskHtml(t) {
+  var meta = [];
+  if (t.deferredFrom) meta.push('<span class="rep">➡️ reportée du ' + fmtDate(t.deferredFrom) + "</span>");
+  if (t.autoImport) meta.push('<span class="rep">📥 via agenda</span>');
+  if (t.evGone) meta.push('<span class="gone">⚠️ plus dans l\'agenda</span>');
+  if (t.gSync === "pending") meta.push('<span class="pend">🔄 à synchroniser</span>');
+  else if (t.gSync === "ok") meta.push("📅 agenda ✓");
+  var dh = dueHtml(t);
+  if (dh) meta.push(dh);
+  meta.push("créée le " + fmtDate(t.createdAt));
+  var metaHtml = '<div class="meta">' + meta.join(" · ") + "</div>";
+  var noteHtml = t.note ? '<div class="note">' + esc(t.note) + "</div>" : "";
+  if (t.cat === "done") {
+    return '<div class="task done">'
+      + '<div class="body"><div class="title"><span class="tp">' + (t.type === "pro" ? "🔴" : "🔵") + "</span>" + esc(t.title) + "</div>" + noteHtml
+      + '<div class="meta">✅ faite le ' + fmtDate(t.doneAt) + "</div></div>"
+      + '<div class="acts">'
+      + '<button onclick="reactivateTask(\'' + t.id + "');renderAll()\">↩️ Réactiver</button>"
+      + '<button title="Supprimer" onclick="onDelete(\'' + t.id + "')\">🗑️</button>"
+      + "</div></div>";
+  }
+  var kk = (t.due ? catForDate(t.due) : "later"); // v12 : bordure déduite de la date au rendu — jamais une catégorie figée
+  return '<div class="task ' + kk + '">'
+    + '<button class="chk" title="Marquer faite" onclick="completeTask(\'' + t.id + "');renderAll()\">✓</button>"
+    + '<div class="body"><div class="title"><span class="tp">' + (t.type === "pro" ? "🔴" : "🔵") + "</span>" + esc(t.title) + "</div>" + noteHtml + metaHtml + "</div>"
+    + '<div class="acts">'
+    + '<button title="Reporter" onclick="deferTask(\'' + t.id + "');renderAll()\">⬅️</button>"
+    + '<button title="Modifier" onclick="openModal(\'' + t.id + "')\">✏️</button>"
+    + '<button title="Supprimer" onclick="onDelete(\'' + t.id + "')\">🗑️</button>"
+    + "</div></div>";
+}
+// tri dans une journée : sans heure d'abord, puis par horaire croissant (classer par date/horaire)
+function cmpDayTime(a, b) {
+  var ta = a.startT || "00:00", tb = b.startT || "00:00";
+  if (ta !== tb) return ta < tb ? -1 : 1;
+  return String(a.title) < String(b.title) ? -1 : 1;
+}
+// onglet 📋 Tâches : retards en rouge, jour en vert, puis chaque date en chronologique, sans date à la fin
+// v13 : ligne événement en lecture dans la section Aujourd'hui — le ＋ en fait une tâche
+function evRowHtml(e) {
+  var timeCol = e.allDay ? "journée" : (e.startT || "—");
+  var when = e.allDay ? "journée entière" : (e.startT ? "🕒 " + e.startT + (e.endT ? "–" + e.endT : "") : "");
+  if (e.until && e.until !== e.day) when += " → jusqu'au " + fmtDate(e.until);
+  var loc = e.loc ? " · 📍 " + esc(e.loc) : "";
+  var dot = (e.color === "11") ? "🔴 " : ((e.color === "9") ? "🔵 " : "");
+  return '<div class="ev today' + (e.allDay ? " allday" : "") + '">'
+    + '<div class="ev-time">' + timeCol + "</div>"
+    + '<div class="ev-b"><div class="title">' + dot + esc(e.title) + "</div>"
+    + '<div class="meta">' + when + loc + "</div></div>"
+    + '<div class="acts">'
+    + '<button class="chk" title="Créer une tâche depuis cet événement" onclick="eventToTask(\'' + e.id + '\')">＋</button>'
+    + "</div></div>";
+}
+function tasksTabHtml() {
+  var td = today();
+  var late = [], nowT = [], dates = [], byDate = {}, nodate = [];
+  state.tasks.forEach(function (t) {
+    if (t.cat === "done") return;
+    if (!t.due) { nodate.push(t); return; }
+    var running = t.until && t.until >= td; // v12 : une tâche multi-jours en cours n'est PAS « en retard »
+    if (t.due < td && !running) { late.push(t); return; }
+    if (t.due <= td) { nowT.push(t); return; }
+    if (!byDate[t.due]) { byDate[t.due] = []; dates.push(t.due); }
+    byDate[t.due].push(t);
+  });
+  late.sort(function (a, b) {
+    if (a.due !== b.due) return a.due < b.due ? -1 : 1;
+    return cmpDayTime(a, b);
+  });
+  nowT.sort(cmpDayTime);
+  // v13 : plus de tri « Sans date » — addTask unshift met déjà les plus récentes en tête (createdAt n'a pas d'heure : les égalités étaient arbitraires)
+  dates.sort();
+  var h = "";
+  if (late.length > 0) {
+    h += '<div class="tsec late">⚠️ En retard (' + late.length + ")</div>";
+    late.forEach(function (t) { h += taskHtml(t); });
+  }
+  // v13 : les événements d'aujourd'hui s'affichent EN LIGNE au milieu des tâches horodatées (le ＋ en fait une tâche)
+  var evs = (state.agendaCache && state.agendaCache.events) || [];
+  var evToday = evs.filter(function (e) { return e.day === td || (e.until && e.day <= td && e.until >= td); });
+  var rows = nowT.map(function (t) { return { k: "0" + (t.startT || "00:00"), h: taskHtml(t) }; })
+    .concat(evToday.map(function (e) { return { k: "1" + (e.startT || "00:00"), h: evRowHtml(e) }; }));
+  rows.sort(function (a, b) { return a.k < b.k ? -1 : (a.k > b.k ? 1 : 0); });
+  if (rows.length > 0) {
+    h += '<div class="tsec today">📋 Aujourd\'hui — ' + dayLongLabel(td) + " (" + nowT.length + " tâche(s) · " + evToday.length + " événement(s))</div>";
+    rows.forEach(function (r) { h += r.h; });
+  }
+  dates.forEach(function (iso) {
+    h += '<div class="tsec">' + dayHeaderLabel(iso) + " (" + byDate[iso].length + ")</div>";
+    byDate[iso].sort(cmpDayTime);
+    byDate[iso].forEach(function (t) { h += taskHtml(t); });
+  });
+  if (nodate.length > 0) {
+    h += '<div class="tsec">📌 Sans date (' + nodate.length + ")</div>";
+    nodate.forEach(function (t) { h += taskHtml(t); });
+  }
+  if (h === "") h = '<div class="empty">Rien ici — appuie sur ＋ pour ajouter.</div>';
+  h += '<div class="tsec-hint">📋 Tout est classé par date puis horaire. Une tâche sans heure du jour passe avant celles horodatées.</div>';
+  return h;
+}
+function renderTasksTab() {
+  var el = document.getElementById("list");
+  if (tab === "lists") { el.innerHTML = listsOverviewHtml(); renderBackupCard(); return; }
+  if (searchQ) {
+    var res = state.tasks.filter(function (t) {
+      if (tab === "done") { if (t.cat !== "done") return false; } // v12 : chercher depuis « Terminé » ne déborde plus sur les actives
+      else if (t.cat === "done") return false;
+      return (String(t.title).toLowerCase().indexOf(searchQ) >= 0)
+        || (String(t.note || "").toLowerCase().indexOf(searchQ) >= 0);
+    }).sort(cmpTasks);
+    var h = '<div class="empty">🔎 ' + res.length + " résultat(s) pour « " + esc(searchQ) + " »</div>";
+    res.forEach(function (t) { h += taskHtml(t); });
+    el.innerHTML = h;
+    renderBackupCard();
+    return;
+  }
+  if (tab === "done") {
+    var tasks = state.tasks.filter(function (t) { return t.cat === "done"; })
+      .sort(function (a, b) { return String(b.doneAt || "") < String(a.doneAt || "") ? -1 : 1; });
+    var html = "";
+    if (tasks.length === 0) html = '<div class="empty">Rien de terminé pour l\'instant.</div>';
+    else tasks.forEach(function (t) { html += taskHtml(t); });
+    el.innerHTML = html;
+  } else {
+    el.innerHTML = tasksTabHtml(); // 📋 Tâches : classé par date puis horaire
+  }
+  renderBackupCard();
+}
+function renderWarnCard() {
+  var el = document.getElementById("warnCard");
+  if (!el) return;
+  var cfg = state.cfg || {};
+  var needAgenda = !cfg.cid || !cfg.refresh;
+  var needDrive = !cfg.dCid || !cfg.dRefresh;
+  if ((needAgenda || needDrive) && state.hideWarn !== true) {
+    var txt = "⚠️ <b>Synchro inactive sur cet appareil</b> — ";
+    var parts = [];
+    if (needAgenda) parts.push("agenda Google non connecté");
+    if (needDrive) parts.push("sauvegarde Drive non configurée");
+    txt += parts.join(" · ") + ". Onglet 📅 → « Connecter mon agenda Google », et carte ☁️ ci-dessous.";
+    el.innerHTML = '<div class="warnbar"><span>' + txt + "</span>"
+      + '<button title="Masquer" onclick="hideWarnCard()">✕</button></div>';
+  } else {
+    el.innerHTML = "";
+  }
+}
+function hideWarnCard() {
+  state.hideWarn = true;
+  persist();
+  renderWarnCard();
+}
+var persistOk = null; // stockage persistant accordé par le navigateur (affiché dans la carte ☁️)
+// carte ☁️ Sauvegarde (v11) : UN seul endroit — état clair en une ligne, réglages en « options avancées »
+function renderBackupCard() {
+  var el = document.getElementById("backupCard");
+  if (!el) return;
+  var cfg = state.cfg || {};
+  var on = !!(cfg.dCid && cfg.dRefresh);
+  var autoB = state.autoBackup !== false;
+  var status;
+  if (!on) {
+    status = '<div class="syncline"><span class="gone">⚠️ Sauvegarde sur cet appareil seulement — active Drive pour ne rien perdre.</span></div>';
+  } else if (state.syncErrors && state.syncErrors.drive) { // v13 : une panne d'agenda n'affiche pas « sauvegarde en échec »
+    status = '<div class="syncline"><span class="gone">🔴 Sauvegarde en échec — reprise automatique au prochain essai.</span></div>';
+  } else if (!state.driveSyncedAt) {
+    status = '<div class="syncline"><span class="pend">🟠 Drive connecté — première sauvegarde en attente.</span></div>';
+  } else if (typeof navigator !== "undefined" && !navigator.onLine) {
+    status = '<div class="syncline"><span class="pend">🟠 Hors ligne — tes changements partiront au retour du réseau.</span></div>';
+  } else {
+    status = '<div class="syncline"><span class="okline">🟢 Tout est sauvegardé — Drive, ' + fmtAgo(state.driveSyncedAt) + '</span></div>'; // v13 : var(--ok) — lisible en thème clair aussi
+  }
+  var h = '<div class="lbl">☁️ Sauvegarde' + (on ? ' <span style="color:#64748b;font-weight:400">· auto ' + (autoB ? "✅" : "⏸️") + '</span>' : '') + '</div>' + status;
+  if (!on) {
+    h += '<div class="hint">Sauvegarde tes tâches et listes dans le dossier <b>' + esc(DRIVE_DEFAULT_FOLDER) + '</b> de ton Drive — puis c\'est automatique (30 s après chaque changement) et ça fusionne les appareils. Réutilise le Refresh Token de l\'app Patrimoine (scope <code>drive.file</code>).</div>'
+      + '<input id="dCid" placeholder="Client ID Google">'
+      + '<input id="dSecret" placeholder="Client Secret (optionnel)" type="password">'
+      + '<input id="dRefresh" placeholder="Refresh Token (drive.file — même que Patrimoine)" type="password">'
+      + '<input id="dFolder" placeholder="Nom du dossier Drive (défaut : ' + esc(DRIVE_DEFAULT_FOLDER) + ')">'
+      + '<div class="btns"><button onclick="driveSaveCfg()">💾 Enregistrer et connecter</button></div>'
+      + '<details><summary style="cursor:pointer;color:#64748b;font-size:13px;padding:6px 0">⚙️ Options avancées</summary><div class="btns">'
+      + '<button onclick="doExport()">💾 Exporter un fichier de secours</button>'
+      + '<button onclick="document.getElementById(\'importFile\').click()">📥 Importer un fichier</button>'
+      + '<button onclick="restoreSecours()">🛟 Restaurer l\'instantané de secours local</button>'
+      + '</div></details>';
+  } else {
+    h += '<div class="btns"><button onclick="driveBackupNow()">☁️ Sauvegarder maintenant</button></div>'
+      + '<details><summary style="cursor:pointer;color:#64748b;font-size:13px;padding:6px 0">⚙️ Options avancées</summary>'
+      + '<div class="syncline">Dossier Drive « ' + esc(cfg.dFolder || DRIVE_DEFAULT_FOLDER) + ' » — ' + esc(DRIVE_FILE_NAME) + '</div>'
+      + '<div class="btns">'
+      + '<button onclick="toggleAutoBackup()">' + (autoB ? "⏸️ Mettre la sauvegarde auto en pause" : "▶️ Réactiver la sauvegarde auto") + '</button>'
+      + '<button onclick="doExport()">💾 Exporter un fichier de secours</button>'
+      + '<button onclick="document.getElementById(\'importFile\').click()">📥 Importer un fichier</button>'
+      + '<button onclick="driveRestoreNow()">📥 Restaurer depuis Drive (remplace tout)</button>'
+      + '<button onclick="restoreSecours()">🛟 Restaurer l\'instantané de secours local</button>'
+      + '<button onclick="driveDisconnect()">🔌 Déconnecter Drive</button>'
+      + '</div>'
+      + (persistOk === null ? "" : '<div class="syncline">💾 ' + (persistOk ? "Stockage persistant actif sur cet appareil." : "Stockage local de cet appareil — fais un export de secours de temps en temps.") + '</div>')
+      + '</details>';
+  }
+  el.innerHTML = h;
+}
+function listCardHtml(l, isSub) {
+  var kids = state.lists.filter(function (c) { return c.parent === l.id; });
+  var pr = (kids.length > 0) ? listProgressAgg(l) : listProgress(l); // progression TOTALE de la branche (avec sous-listes)
+  var pct = pr.total > 0 ? Math.round(100 * pr.done / pr.total) : 0;
+  var subNote = (!isSub && kids.length > 0) ? '<div class="subn">📁 ' + kids.length + " sous-liste(s) · total " + pr.done + "/" + pr.total + "</div>" : "";
+  var tplBadge = (l.template === true) ? '<span class="tpl">📋 modèle</span>' : "";
+  var tplBtn = (l.template === true) ? '<button title="Créer une liste neuve depuis ce modèle (cochages à zéro)" onclick="newFromTemplate(\'' + l.id + "')\">➕ Nouvelle depuis</button>" : "";
+  return '<div class="listcard' + (isSub ? " sub" : "") + '">'
+    + '<div class="name" onclick="openList(\'' + l.id + "')\">" + esc(l.name) + tplBadge + "</div>"
+    + subNote
+    + '<div class="row"><div class="bar"><div style="width:' + pct + '%"></div></div>'
+    + '<span class="cnt">' + pr.done + "/" + pr.total + " ✓</span></div>"
+    + '<div class="acts">'
+    + tplBtn
+    + '<button onclick="openList(\'' + l.id + "')\">Ouvrir</button>"
+    + '<button title="Dupliquer (cochages remis à zéro)" onclick="duplicateList(\'' + l.id + "');renderAll()\">📋 Dupliquer</button>"
+    + '<button' + (armed["L:" + l.id] ? ' class="armed"' : "") + ' onclick="onDeleteList(\'' + l.id + "')\">" + (armed["L:" + l.id] ? "Confirmer ?" : "🗑️") + "</button>"
+    + "</div></div>";
+}
+function listsOverviewHtml() {
+  var html = "";
+  var lists = state.lists;
+  if (searchQ) {
+    lists = state.lists.filter(function (l) {
+      if (String(l.name).toLowerCase().indexOf(searchQ) >= 0) return true;
+      return (l.items || []).some(function (it) { return String(it.text).toLowerCase().indexOf(searchQ) >= 0; });
+    });
+    if (lists.length === 0) return '<div class="empty">🔎 Aucune liste ne correspond à « ' + esc(searchQ) + ' ».</div>';
+    html += '<div class="empty">🔎 ' + lists.length + " liste(s) trouvée(s)</div>";
+  } else if (state.lists.length === 0) {
+    return '<div class="empty">Aucune liste — appuie sur ＋ (ex : « Matériel manœuvre »).</div>';
+  }
+  var idsIn = {};
+  lists.forEach(function (l) { idsIn[l.id] = true; });
+  var roots = lists.filter(function (l) { return !l.parent || !idsIn[l.parent]; });
+  function tree(l, isSub) {
+    var h = listCardHtml(l, isSub);
+    state.lists.filter(function (c) { return c.parent === l.id; }).forEach(function (c) { h += tree(c, true); }); // récursif : tous les niveaux
+    return h;
+  }
+  roots.forEach(function (l) { html += tree(l, false); });
+  return html;
+}
+function renderListDetail() {
+  var el = document.getElementById("listDetail");
+  var l = getList(currentListId || "");
+  if (!l) { showView("tasks"); return; }
+  var pr = listProgress(l);
+  var pct = pr.total > 0 ? Math.round(100 * pr.done / pr.total) : 0;
+  var hasKids = state.lists.some(function (c) { return c.parent === l.id; });
+  var agg = hasKids ? listProgressAgg(l) : null;
+  var html = '<div class="ld-head">'
+    + '<button class="rowbtn" onclick="closeList()">← Listes</button>'
+    + '<div class="t"><h2>' + esc(l.name) + '</h2><span class="cnt">' + pr.done + "/" + pr.total + " ✓" + (agg ? " · total " + agg.done + "/" + agg.total : "") + "</span></div>"
+    + '<div class="bar" style="width:70px"><div style="width:' + pct + '%"></div></div>'
+    + '<button class="rowbtn" title="' + (reorderMode ? "Quitter le mode réordonner" : "Réordonner les éléments (▲ ▼)") + '" onclick="toggleReorderMode()">⇅</button>' // v13 : les ▲▼ vivent ici, plus sur chaque ligne
+    + '<button class="rowbtn" title="Renommer" onclick="openListModal(\'' + l.id + "')\">✏️</button>"
+    + "</div>";
+  var shown = (l.hideDone === true) ? l.items.filter(function (x) { return !x.done; }) : l.items;
+  var nDone = l.items.length - shown.length;
+  if (l.items.length === 0) {
+    html += '<div class="empty">Liste vide — ajoute ton premier élément ci-dessous.</div>';
+  } else if (shown.length === 0) {
+    html += '<div class="empty">🙈 Tous les éléments sont cochés — ' + nDone + " masqué(s).</div>";
+  }
+  shown.forEach(function (it) {
+    var idx = l.items.indexOf(it);
+    var masked = it.secret && !revealed[it.id];
+    var txtHtml = it.qty ? '<span class="qty">' + it.qty + " × </span>" : "";
+    if (masked) txtHtml += '<span class="masked">••••••</span>';
+    else txtHtml += esc(it.text);
+    html += '<div class="item' + (it.secret ? " secret" : "") + '">'
+      + '<button class="chk' + (it.done ? " on" : "") + '" onclick="toggleItem(\'' + l.id + "','" + it.id + "');renderAll()\">" + (it.done ? "✓" : "") + "</button>"
+      + '<div class="txt' + (it.done ? " done" : "") + '"' + (reorderMode ? "" : ' style="cursor:pointer" onclick="openItemModal(\'' + l.id + "','" + it.id + '\')"') + '>' + txtHtml + "</div>" // v13 : tap sur le texte = modifier (le ✏️ disparaît du mode normal)
+      + (reorderMode // v13 : les ▲▼ ne vivent QUE dans le mode ⇅ — 360 px ne tenait pas 6 boutons par ligne
+        ? '<button class="min" title="Monter"' + (idx === 0 ? " disabled" : "") + ' onclick="moveItem(\'' + l.id + "','" + it.id + '\',-1);renderAll()">▲</button>'
+          + '<button class="min" title="Descendre"' + (idx === l.items.length - 1 ? " disabled" : "") + ' onclick="moveItem(\'' + l.id + "','" + it.id + '\',1);renderAll()">▼</button>'
+        : (it.secret
+        ? '<button class="min" title="' + (masked ? "Révéler" : "Masquer") + '" onclick="toggleReveal(\'' + it.id + "')\">" + (masked ? "👁" : "🙈") + "</button>"
+          + '<button class="min" title="Copier le code (sans le montrer à l\'écran)" onclick="copyItemSecret(\'' + l.id + "','" + it.id + '\')">📋</button>'
+        : ""))
+      + '<button class="del" onclick="deleteItem(\'' + l.id + "','" + it.id + "');renderAll()\">✕</button>"
+      + "</div>";
+  });
+  html += '<div class="addrow">'
+    + '<textarea id="itemInput" rows="2" placeholder="' + (secretNext ? "Ajouter un code (masqué ••••)…" : "Ajouter un élément… (« 4x pulkas » = quantité) — colle plusieurs lignes : chaque ligne = un élément") + '" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){addItemFromInput();event.preventDefault()}"></textarea>'
+    + '<button class="sectgl' + (secretNext ? " on" : "") + '" title="Mode code masqué : le prochain élément sera masqué ••••" onclick="toggleSecretNext()">🔐</button>'
+    + '<button onclick="addItemFromInput()">＋</button>'
+    + "</div>";
+  var subs = state.lists.filter(function (c) { return c.parent === l.id; });
+  if (subs.length > 0) {
+    html += '<div class="flabel" style="margin-top:14px">📁 Sous-listes</div><div class="subchips">';
+    subs.forEach(function (c) {
+      var prc = listProgress(c);
+      html += '<button onclick="openList(\'' + c.id + "')\">" + esc(c.name) + " · " + prc.done + "/" + prc.total + "</button>";
+    });
+    html += "</div>";
+  }
+  html += '<div class="ld-foot">'
+    + '<button onclick="resetChecks(\'' + l.id + "');renderAll()\">🔁 Tout décocher</button>"
+    + (l.hideDone === true
+      ? '<button onclick="toggleHideDone(\'' + l.id + '\')">👁 Afficher les ' + nDone + " coché(s)</button>"
+      : '<button onclick="toggleHideDone(\'' + l.id + '\')">🙈 Masquer cochés</button>')
+    + '<button onclick="shareList(\'' + l.id + '\')">📤 Partager</button>'
+    + '<button onclick="copyListText(\'' + l.id + "')\">📋 Copier en texte</button>"
+    + '<button onclick="duplicateList(\'' + l.id + "');renderAll()\">📋 Dupliquer</button>"
+    + '<button onclick="toggleTemplate(\'' + l.id + "')\">" + (l.template === true ? "📌 Modèle : ✅ ON" : "📌 Garder comme modèle") + "</button>"
+    + '<button onclick="openListModal(null,\'' + l.id + "')\">➕ Sous-liste</button>"
+    + '<button' + (armed["L:" + l.id] ? ' class="armed"' : "") + ' onclick="onDeleteList(\'' + l.id + "')\">" + (armed["L:" + l.id] ? "Confirmer ?" : "🗑️ Supprimer") + "</button>"
+    + "</div>";
+  el.innerHTML = html;
+}
+function addItemFromInput() {
+  var inp = document.getElementById("itemInput");
+  if (!inp || !currentListId) return;
+  var v = (inp.value || "").trim();
+  if (!v) return;
+  // collage en lot : une ligne = un élément (pratique pour coller une liste entière)
+  var lines = v.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  lines.forEach(function (ln) { addItem(currentListId, ln, secretNext); });
+  var n = lines.length;
+  secretNext = false;
+  inp.value = ""; // v13 : vidé AVANT le rendu — sinon la préservation de frappe le restaurerait
+  renderAll();
+  var el = document.getElementById("itemInput");
+  if (el) el.focus(); // le rendu remplace le DOM : on rend le focus au champ, le clavier reste ouvert
+  if (n > 1) showToast("➕ " + n + " éléments ajoutés (collage en lot)");
+}
+function closeList() {
+  currentListId = null;
+  reorderMode = false; // v13 : on ne garde pas le mode ⇅ en changeant d'écran
+  showView("tasks");
+}
+function renderAgenda() {
+  var el = document.getElementById("agBody");
+  if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) {
+    el.innerHTML = '<div class="cfg-card">'
+      + '<div class="h">🔌 Connecter mon agenda Google</div>'
+      + '<div class="hint">Lecture de tes événements (fenêtre réglable 7/14/30 jours, 30 par défaut) <b>et écriture bidirectionnelle</b> : '
+      + 'une tâche peut être placée dans ton agenda d\'un seul bouton, se met à jour si tu la modifies, '
+      + 'l\'événement est supprimé de l\'agenda si tu supprimes la tâche (et inversement) '
+      + '— et ✏️ chaque événement peut être <b>modifié directement ici</b> (titre, dates, horaires, lieu), '
+      + 'la tâche liée suit automatiquement.<br>Les tâches 🔴 <b>pro</b> créent un événement <b>rouge</b> '
+      + 'dans l\'agenda, les tâches 🔵 <b>perso</b> un événement <b>bleu</b>.<br>Récupère un Refresh Token sur <b>OAuth Playground</b> '
+      + 'avec le scope :<br><code>https://www.googleapis.com/auth/calendar</code><br>'
+      + '(la même marche à suivre que la sauvegarde Drive de l\'app Patrimoine, avec ce scope-là — '
+      + 'il couvre lecture ET écriture).</div>'
+      + '<input id="aCid" placeholder="Client ID Google">'
+      + '<input id="aSecret" placeholder="Client Secret (optionnel pour certains clients)" type="password">'
+      + '<input id="aRefresh" placeholder="Refresh Token (OAuth Playground)" type="password">'
+      + '<div class="ag-actions">'
+      + '<button onclick="if(saveAgendaCfg()){agendaRefresh();}">💾 Enregistrer et tester</button>'
+      + "</div></div>";
+    return;
+  }
+  maybeAutoRefresh();
+  var evs = (state.agendaCache && state.agendaCache.events) || [];
+  var auto = state.autoAgenda === true;
+  var win = agendaWindowDays();
+  var html = '<div class="ag-actions">'
+    + '<button onclick="agendaRefresh()">🔄 Actualiser</button>'
+    + '<select onchange="saveAgendaDays(this.value)">'
+    + '<option value="7"' + (win === 7 ? " selected" : "") + '>7 jours</option>'
+    + '<option value="14"' + (win === 14 ? " selected" : "") + '>14 jours</option>'
+    + '<option value="30"' + (win === 30 ? " selected" : "") + '>30 jours</option>'
+    + "</select>"
+    + '<button onclick="importAllNow()">📥 Tout importer en tâches</button>'
+    + '<button class="' + (auto ? "on" : "") + '" onclick="toggleAutoAgenda()">' + (auto ? "📥 Import auto : ✅ ON" : "📥 Import auto : ❌ OFF") + "</button>"
+    + '<button onclick="agendaDisconnect()">Déconnecter</button>'
+    + "</div>"
+    + '<div class="syncline">Dernière synchro agenda : ' + fmtAgo(state.agendaCache && state.agendaCache.fetchedAt) + "</div>"
+    + '<div class="hint" style="font-size:12px;color:var(--muted);padding:0 2px 6px">'
+    + (auto
+      ? "✅ Import auto <b>activé</b> : chaque actualisation transforme les nouveaux événements des " + win + " prochains jours en tâches, <b>et met à jour les tâches si l'événement bouge</b> (sauf celles que tu modifies toi-même)."
+      : "📥 Import auto <b>désactivé</b> : active-le pour que chaque événement de l'agenda devienne une tâche tout seul et se mette à jour tout seul, ou utilise « Tout importer en tâches ».")
+    + "</div>";
+  if (evs.length === 0) {
+    html += '<div class="empty">Aucun événement chargé — appuie sur 🔄 Actualiser.<br>'
+      + 'Sur chaque événement, ＋ crée une tâche avec sa date et ses horaires, ✏️ le modifie dans ton agenda Google.</div>';
+  }
+  var days = {};
+  var horizon = addDaysISO(today(), win);
+  evs.forEach(function (e) {
+    (days[e.day] = days[e.day] || []).push(e);
+    // événement multi-jours : il apparaît sur CHAQUE jour couvert (pas seulement le premier)
+    if (e.until && e.until !== e.day) {
+      var cur = addDaysISO(e.day, 1);
+      while (cur <= e.until && cur <= horizon) {
+        (days[cur] = days[cur] || []).push(e);
+        cur = addDaysISO(cur, 1);
+      }
+    }
+  });
+  Object.keys(days).sort().forEach(function (day) {
+    var isToday = day === today();
+    html += '<div class="day-h' + (isToday ? " today" : "") + '">'
+      + (isToday ? '<span class="day-tag">AUJOURD\'HUI</span>' : "")
+      + '<span>📅 ' + dayHeaderLabel(day) + "</span>"
+      + '<span class="day-count">' + days[day].length + " événement" + (days[day].length > 1 ? "s" : "") + "</span></div>";
+    days[day].forEach(function (e) {
+      var timeCol = e.allDay ? "journée" : (e.startT || "—");
+      var when = e.allDay ? "journée entière" : "🕒 " + e.startT + (e.endT ? "–" + e.endT : "");
+      if (e.until && e.until !== e.day) when += " → jusqu'au " + fmtDate(e.until);
+      var loc = e.loc ? " · 📍 " + esc(e.loc) : "";
+      var dot = (e.color === "11") ? "🔴 " : ((e.color === "9") ? "🔵 " : "");
+      var inst = String(e.id).indexOf("_") >= 0; // occurrence d'un événement répété : non modifiable ici
+      html += '<div class="ev' + (e.allDay ? " allday" : "") + '">'
+        + '<div class="ev-time">' + timeCol + "</div>"
+        + '<div class="ev-b"><div class="title">' + dot + esc(e.title) + "</div>"
+        + '<div class="meta">' + when + loc + "</div></div>"
+        + '<div class="acts">'
+        + '<button class="chk" title="Créer une tâche depuis cet événement" onclick="eventToTask(\'' + e.id + "')\">＋</button>"
+        + '<button class="chk" title="' + (inst ? "Occurrence d'un événement répété — modifie l'événement d'origine dans Google Agenda" : "Modifier cet événement dans ton agenda Google") + '" onclick="openEvModal(\'' + e.id + "')\">✏️</button>"
+        + "</div></div>";
+    });
+  });
+  el.innerHTML = html;
+}
+function showView(v) {
+  view = v;
+  document.getElementById("view-tasks").className = (v === "tasks") ? "wrap" : "wrap hidden";
+  document.getElementById("view-agenda").className = (v === "agenda") ? "" : "hidden";
+  document.getElementById("view-list").className = (v === "list") ? "" : "hidden";
+  document.getElementById("fab").style.display = (v === "tasks") ? "" : "none";
+  renderAll();
+}
+function setTab(k) {
+  if (TABS.indexOf(k) >= 0) tab = k;
+  renderAll();
+}
+function onFab() {
+  if (tab === "lists") openListModal();
+  else openQuickAdd(); // saisie rapide ; « ⚙️ Plus d'options » ouvre la modale complète
+}
+function renderAll() {
+  // v13 : un rendu déclenché en arrière-plan (fusion Drive, rafraîchissement agenda) ne doit pas
+  // effacer une frappe en cours dans « Ajouter un élément » ni fermer le clavier
+  var _inp = (typeof document !== "undefined" && document.getElementById) ? document.getElementById("itemInput") : null;
+  var _keep = null;
+  if (_inp && typeof document.activeElement !== "undefined" && document.activeElement === _inp) {
+    _keep = { v: _inp.value, s: _inp.selectionStart, e: _inp.selectionEnd };
+  }
+  renderTabs();
+  renderWarnCard();
+  renderSyncPill(); // pastille 🟢🟠🔴 dans l'en-tête
+  updateBadge(); // badge de l'icône = retards + aujourd'hui
+  if (view === "tasks") renderTasksTab();
+  else if (view === "list") renderListDetail();
+  else renderAgenda();
+  if (_keep) {
+    var el2 = document.getElementById("itemInput");
+    if (el2) { el2.value = _keep.v; try { el2.focus(); el2.setSelectionRange(_keep.s, _keep.e); } catch (e) {} }
+  }
+}
+
+// ---------- Saisie rapide (une ligne + puces de date) ----------
+var quickDue = "today";
+var quickType = "perso";
+function openQuickAdd() {
+  var inp = document.getElementById("qTitle");
+  if (inp) inp.value = "";
+  quickPick("today");
+  quickPickType("perso");
+  var chk = document.getElementById("qAgenda");
+  if (chk) chk.checked = (state.cfg && state.cfg.quickAgenda) === true; // le choix agenda est mémorisé
+  var dp = document.getElementById("qDate");
+  if (dp) dp.value = "";
+  document.getElementById("quickModal").className = "modal";
+  try { if (inp && inp.focus) inp.focus(); } catch (e) {}
+}
+function closeQuickAdd() {
+  document.getElementById("quickModal").className = "modal hidden";
+}
+function quickPick(k) {
+  quickDue = k;
+  ["today", "tomorrow", "week", "none"].forEach(function (c) {
+    var el = document.getElementById("q-" + c);
+    if (el) el.className = "chip" + (c === k ? " on" : "");
+  });
+}
+function quickDateChange() {
+  var v = (document.getElementById("qDate").value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    quickDue = "date"; // date manuelle choisie : elle prime sur les puces
+    ["today", "tomorrow", "week", "none"].forEach(function (c) {
+      var el = document.getElementById("q-" + c);
+      if (el) el.className = "chip";
+    });
+  }
+}
+function quickDueIso() {
+  if (quickDue === "date") return (document.getElementById("qDate").value || "").trim() || null;
+  if (quickDue === "today") return today();
+  if (quickDue === "tomorrow") return addDaysISO(today(), 1);
+  if (quickDue === "week") return addDaysISO(today(), 7);
+  return null;
+}
+function quickPickType(k) {
+  quickType = k;
+  ["pro", "perso"].forEach(function (c) {
+    var el = document.getElementById("qt-" + c);
+    if (el) el.className = "chip" + (c === k ? " on" : "");
+  });
+}
+function quickSave() {
+  var title = (document.getElementById("qTitle").value || "").trim();
+  if (!title) { showToast("⚠️ Donne un titre à la tâche"); return; }
+  var due = quickDueIso();
+  var cat = due ? catForDate(due) : "later"; // v11 : la DATE classe la tâche ; sans date → « Sans date » (catégorie interne later)
+  var chk = document.getElementById("qAgenda");
+  var wantAgenda = !!(chk && chk.checked && due);
+  if (chk) state.cfg = Object.assign({}, state.cfg || {}, { quickAgenda: chk.checked === true }); // choix mémorisé
+  var t = addTask(title, "", cat, due, quickType === "pro" ? "pro" : "perso", {});
+  closeQuickAdd();
+  renderAll();
+  if (wantAgenda) {
+    if (state.cfg && state.cfg.cid && state.cfg.refresh) { showToast("💾 Ajoutée — 📅 synchro agenda en cours…"); taskToEvent(t.id); }
+    else showToast("✅ Tâche ajoutée (agenda non connecté)");
+  } else {
+    showToast("✅ Tâche ajoutée");
+  }
+}
+// « ⚙️ Plus d'options » : la saisie rapide bascule vers la modale complète, titre et date conservés
+function quickMore() {
+  var title = (document.getElementById("qTitle").value || "").trim();
+  var due = quickDueIso();
+  openModal();
+  document.getElementById("mTitle").value = title;
+  if (due) document.getElementById("mDue").value = due;
+  closeQuickAdd();
+}
+
+// ---------- Reporter (feuille : demain, +7 j, date au choix) ----------
+var deferId = null;
+function openDeferSheet(id) {
+  if (!getTask(id)) return;
+  deferId = id;
+  var t = getTask(id);
+  var base = (t && t.due && t.due > today()) ? t.due : today(); // même base que deferBy
+  var inp = document.getElementById("dfrDate");
+  if (inp) inp.value = addDaysISO(base, 1);
+  var b; // v12 : la date résultante est écrite sur chaque puce — plus d'ambiguïté
+  b = document.getElementById("dfrB1"); if (b) b.textContent = (base <= today() ? "Demain" : "＋1 jour") + " · " + fmtDate(addDaysISO(base, 1));
+  b = document.getElementById("dfrB7"); if (b) b.textContent = "＋7 j · " + fmtDate(addDaysISO(base, 7));
+  b = document.getElementById("dfrB14"); if (b) b.textContent = "＋14 j · " + fmtDate(addDaysISO(base, 14));
+  document.getElementById("deferModal").className = "modal";
+}
+function closeDeferSheet() {
+  document.getElementById("deferModal").className = "modal hidden";
+  deferId = null;
+}
+function deferBy(n) {
+  if (!deferId) return;
+  var t = getTask(deferId);
+  if (!t) { closeDeferSheet(); return; }
+  var base = (t.due && t.due > today()) ? t.due : today(); // v12 : une tâche en retard reportée « demain » l'est VRAIMENT demain
+  deferTo(t.id, addDaysISO(base, n));
+}
+function deferPicked() {
+  var v = (document.getElementById("dfrDate").value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { showToast("⚠️ Choisis une date de report"); return; }
+  if (deferId) deferTo(deferId, v);
+}
+
+// ---------- Pastille de synchro (en-tête : 🟢 OK / 🟠 partiel ou échec / 🔴 reconnexion nécessaire) ----------
+function setSyncError(scope, err) {
+  var msg = String((err && err.message) || err || "");
+  var kind = /invalid_grant|api 401|expired|revoked/i.test(msg) ? "auth" : "err"; // v12 : « api 401 » = jeton refusé → 🔴
+  state.syncErrors = state.syncErrors || {};
+  state.syncErrors[scope] = { scope: scope, kind: kind, at: Date.now() }; // v13 : une panne d'agenda n'efface plus la panne Drive (plus de slot unique)
+  persist();
+  renderSyncPill();
+}
+function clearSyncError(scope) {
+  if (state.syncErrors && state.syncErrors[scope]) {
+    delete state.syncErrors[scope];
+    persist();
+    renderSyncPill();
+  }
+}
+function renderSyncPill() {
+  var el = document.getElementById("syncPill");
+  if (!el) return;
+  var cfg = state.cfg || {};
+  var hasAgenda = !!(cfg.cid && cfg.refresh);
+  var hasDrive = !!(cfg.dCid && cfg.dRefresh);
+  var errs13 = state.syncErrors ? Object.keys(state.syncErrors).map(function (k) { return state.syncErrors[k]; }) : []; // v13 : les pannes s'additionnent au lieu de s'écraser
+  var auth13 = errs13.filter(function (er) { return er && er.kind === "auth"; })[0] || null;
+  if (errs13.length > 0) {
+    el.textContent = auth13 ? "🔴" : "🟠";
+    el.title = auth13
+      ? "Reconnexion Google nécessaire (jeton refusé) — " + errs13.map(function (er) { return er.scope; }).join(" + ")
+      : "Dernière synchro " + errs13.map(function (er) { return er.scope; }).join(" + ") + " en échec — vérifie la connexion";
+  } else if (!hasAgenda && !hasDrive) {
+    el.textContent = "🟠";
+    el.title = "Google non connecté (agenda + Drive)";
+  } else if (!hasAgenda || !hasDrive) {
+    el.textContent = "🟠";
+    el.title = "Google partiellement connecté (" + (hasDrive ? "Drive seul" : "agenda seul") + ")";
+  } else {
+    el.textContent = "🟢";
+    el.title = "Synchro Google active — dernière sauvegarde Drive : " + fmtAgo(state.driveSyncedAt);
+  }
+}
+
+// ---------- Thème clair ☀️ / sombre 🌙 ----------
+function applyTheme() {
+  var light = !!(state.cfg && state.cfg.light);
+  if (typeof document !== "undefined" && document.documentElement) {
+    try { document.documentElement.className = light ? "light" : ""; } catch (e) {}
+  }
+  var mt = (typeof document !== "undefined" && document.querySelector) ? document.querySelector('meta[name="theme-color"]') : null;
+  if (mt) { try { mt.setAttribute("content", light ? "#eef2f7" : "#020617"); } catch (e) {} } // v12 : la barre système suit le thème
+  var b = document.getElementById("themeBtn");
+  if (b) b.textContent = light ? "☀️" : "🌙";
+}
+function toggleTheme() {
+  state.cfg = Object.assign({}, state.cfg || {}, { light: !(state.cfg && state.cfg.light) });
+  persist();
+  applyTheme();
+}
+
+// ---------- Badge de l'icône (retards + aujourd'hui) ----------
+function updateBadge() {
+  try {
+    var n = counts().today || 0;
+    if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n);
+    else if (navigator.clearAppBadge) navigator.clearAppBadge();
+  } catch (e) {}
+}
+
+// ---------- Modale tâche ----------
+function renderCats() { // v11 : plus de boutons de catégorie — la date classe la tâche (types pro/perso conservés)
+  renderTypes();
+}
+function renderTypes() {
+  var html = "";
+  TYPES.forEach(function (k) {
+    html += '<label id="tlbl-' + k + '" onclick="pickType(\'' + k + '\')"><input type="radio" name="mType" id="mType-' + k + '" value="' + k + '"><span>' + TYPE_LABELS[k] + "</span></label>";
+  });
+  document.getElementById("mTypes").innerHTML = html;
+  pickType("perso");
+}
+function pickType(k) {
+  TYPES.forEach(function (c) {
+    var r = document.getElementById("mType-" + c);
+    var l = document.getElementById("tlbl-" + c);
+    if (r) r.checked = (c === k);
+    if (l) l.className = (c === k) ? "on" : "";
+  });
+}
+function openModal(id) {
+  editId = id || null;
+  var t = editId ? getTask(editId) : null;
+  document.getElementById("mLabel").textContent = t ? "Modifier la tâche" : "Nouvelle tâche";
+  document.getElementById("mTitle").value = t ? t.title : "";
+  document.getElementById("mNote").value = t ? t.note : "";
+  document.getElementById("mDue").value = t && t.due ? t.due : "";
+  document.getElementById("mUntil").value = (t && t.until && t.until !== t.due) ? t.until : "";
+  document.getElementById("mStart").value = t && t.startT ? t.startT : "";
+  document.getElementById("mEnd").value = t && t.endT ? t.endT : "";
+  document.getElementById("mRep").value = (t && t.rep && t.rep.mode) ? t.rep.mode : "none";
+  document.getElementById("mRepEvery").value = (t && t.rep && t.rep.every) ? t.rep.every : "";
+  document.getElementById("mRepCount").value = (t && t.rep && t.rep.count) ? t.rep.count : "";
+  onRepChange();
+  pickType(t ? (t.type === "pro" ? "pro" : "perso") : "perso");
+  document.getElementById("modal").className = "modal";
+}
+function onRepChange() {
+  var mode = (document.getElementById("mRep") || {}).value || "none";
+  var row = document.getElementById("mRepRow");
+  if (row) row.style.display = (mode === "none") ? "none" : "flex";
+  var evIn = document.getElementById("mRepEvery");
+  if (evIn) evIn.style.display = (mode === "ndays") ? "block" : "none";
+}
+function readRepModal() {
+  var mode = (document.getElementById("mRep") || {}).value || "none";
+  if (mode === "none") return null;
+  var every = null;
+  if (mode === "ndays") every = parseInt((document.getElementById("mRepEvery") || {}).value, 10);
+  var count = parseInt((document.getElementById("mRepCount") || {}).value, 10);
+  return { mode: mode, every: isNaN(every) ? null : every, count: isNaN(count) ? null : count };
+}
+function closeModal() {
+  document.getElementById("modal").className = "modal hidden";
+  editId = null;
+}
+// Enregistrer : par défaut crée/met à jour AUSSI l'événement agenda (app + agenda en un geste).
+// saveModal(false) = enregistrer sans toucher à l'agenda.
+function saveModal(autoSync) {
+  var title = (document.getElementById("mTitle").value || "").trim();
+  if (!title) { showToast("⚠️ Donne un titre à la tâche"); return null; }
+  var note = document.getElementById("mNote").value || "";
+  var due = document.getElementById("mDue").value || null;
+  var until = ((document.getElementById("mUntil") || {}).value || "").trim() || null;
+  if (until && due && until < due) { showToast("⚠️ « Jusqu'au » doit être après la date de début"); return null; }
+  var startT = validHM(((document.getElementById("mStart") || {}).value || "").trim());
+  var endT = validHM(((document.getElementById("mEnd") || {}).value || "").trim());
+  if (startT && endT && endT <= startT) { showToast("⚠️ L'heure de fin doit être après l'heure de début"); return null; }
+  var rep = readRepModal();
+  if (rep && rep.mode === "ndays" && !rep.every) { showToast("⚠️ Indique « tous les combien de jours » (2, 3…)"); return null; }
+  var t0 = editId ? getTask(editId) : null;
+  var cat = due ? catForDate(due) : (t0 ? t0.cat : "later"); // v11 : la DATE classe la tâche (catégorie interne déduite, plus de boutons)
+  var type = "perso";
+  TYPES.forEach(function (c) {
+    var r = document.getElementById("mType-" + c);
+    if (r && r.checked) type = c;
+  });
+  var extra = { startT: startT, endT: endT, until: until, rep: rep };
+  var t;
+  if (editId) {
+    editTask(editId, title, note, cat, due, type, extra);
+    t = getTask(editId);
+  } else {
+    t = addTask(title, note, cat, due, type, extra);
+  }
+  closeModal();
+  renderAll();
+  if (autoSync !== false && t && !t.autoImport) {
+    if (!t.due) showToast("✅ Tâche enregistrée (sans échéance : rien à mettre dans l'agenda)");
+    else if (!state.cfg || !state.cfg.cid || !state.cfg.refresh) showToast("✅ Tâche enregistrée (agenda non connecté)");
+    else { showToast("💾 Enregistré — 📅 synchro agenda en cours…"); taskToEvent(t.id); }
+  }
+  return t;
+}
+
+// ---------- Modale liste ----------
+function openListModal(id, parentId) {
+  editListId = id || null;
+  newListParent = (!editListId && parentId && getList(parentId)) ? parentId : null;
+  var l = editListId ? getList(editListId) : null;
+  var p = newListParent ? getList(newListParent) : null;
+  document.getElementById("lLabel").textContent = l ? "Modifier la liste" : (p ? "Nouvelle sous-liste de « " + p.name + " »" : "Nouvelle liste");
+  document.getElementById("lName").value = l ? l.name : "";
+  document.getElementById("listModal").className = "modal";
+}
+function closeListModal() {
+  document.getElementById("listModal").className = "modal hidden";
+  editListId = null;
+  newListParent = null;
+}
+function saveListModal() {
+  var name = (document.getElementById("lName").value || "").trim();
+  if (!name) { showToast("⚠️ Donne un nom à la liste"); return; }
+  if (editListId) renameList(editListId, name);
+  else addList(name, newListParent);
+  newListParent = null;
+  closeListModal();
+  renderAll();
+}
+
+// ---------- Toast (avec bouton « Annuler » quand une action est proposée) ----------
+var toastTimer = null;
+function showToast(msg, opts) {
+  opts = opts || {};
+  var el = document.getElementById("toast");
+  if (opts.action) {
+    el.innerHTML = esc(msg) + ' <button onclick="undoLast()">' + esc(opts.action) + "</button>";
+    el.className = "show act"; // pointer-events actifs : le bouton doit être cliquable
+  } else {
+    el.textContent = msg;
+    el.className = "show";
+  }
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.className = ""; }, opts.ttl || 2600);
+}
+
+// ---------- Démarrage ----------
+document.getElementById("vBadge").textContent = APP_VERSION;
+applyTheme(); // ☀️/🌙 mémorisé dans la config
+renderCats();
+showView("tasks");
+// Au lancement : 1) fusion avec la sauvegarde Drive (récupère ce qui manque sur cet appareil)
+// 2) reprise des tâches « à synchroniser » 3) rafraîchissement agenda silencieux si périmé
+driveMergeOnStart().then(function () {
+  retryPendingSync();
+  maybeAutoRefresh();
+});
+// v13 : fermer les 6 feuilles d'un coup (Échap, fond de feuille)
+function closeAllSheets() {
+  try { closeModal(); } catch (e2) {}
+  try { closeListModal(); } catch (e2) {}
+  try { closeEvModal(); } catch (e2) {}
+  try { closeQuickAdd(); } catch (e2) {}
+  try { closeDeferSheet(); } catch (e2) {}
+  try { closeItemModal(); } catch (e2) {}
+}
+// Retour au premier plan de l'app (PWA) : on resynchronise
+if (typeof document !== "undefined" && document.addEventListener) {
+  // Échap = fermer la feuille ouverte (n'importe laquelle)
+  document.addEventListener("keydown", function (e) {
+    if (e && e.key === "Escape") closeAllSheets(); // v13 : une seule fonction pour les 6 feuilles
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (typeof document.hidden !== "undefined" && document.hidden) {
+      if (_dirty && state.autoBackup !== false) driveBackupNow(true); // v12 : seulement si des changements partis — et sans violer la pause auto
+      return;
+    }
+    renderAll(); // changement de jour pendant que l'app était en arrière-plan → réaffichage juste
+    driveMergeOnStart(); // fusion Drive aussi au premier plan, pas seulement au lancement
+    maybeAutoRefresh();
+    retryPendingSync();
+  });
+  // v13 : fermeture par le fond — sur téléphone, le doigt peut glisser entre pointerdown et click :
+  // on ne ferme QUE si pointerdown ET click visent le MÊME fond de feuille (jamais un bouton dessous)
+  var _bd = null;
+  document.addEventListener("pointerdown", function (e) {
+    _bd = (e.target && e.target.classList && e.target.classList.contains("modal")) ? e.target : null;
+  });
+  document.addEventListener("click", function (e) {
+    if (_bd && e.target === _bd) closeAllSheets();
+    _bd = null;
+  });
+}
+if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().then(function (ok) {
+    persistOk = ok; // affiché dans la carte ☁️ (options avancées)
+    try { renderBackupCard(); } catch (e) {}
+  }).catch(function () {});
+}
+if ('serviceWorker' in navigator) {
+  var _hadSW = !!(navigator.serviceWorker.controller);
+  addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (_hadSW) showToast("🔄 Nouvelle version installée — recharge la page pour l'obtenir");
+    _hadSW = true;
+  });
+}
+</script>
+</body>
+</html>
