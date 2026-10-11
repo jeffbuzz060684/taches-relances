@@ -34,7 +34,7 @@
   .wrap { max-width: 560px; margin: 0 auto; }
   .hidden { display: none !important; }
   #tabbar {
-    display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
     padding: 10px 10px 6px; max-width: 560px; margin: 0 auto;
   }
   .tab {
@@ -44,6 +44,7 @@
     font-family: inherit; appearance: none; -webkit-appearance: none; width: 100%;
   }
   .tab .n { display: block; font-size: 15px; font-weight: 800; }
+  .tab.active.tasks { border-color: #38bdf8; color: #38bdf8; background: rgba(56,189,248,0.08); }
   .tab.active.urgent { border-color: #fb7185; color: #fb7185; background: rgba(251,113,133,0.08); }
   .tab.active.week   { border-color: #fbbf24; color: #fbbf24; background: rgba(251,191,36,0.08); }
   .tab.active.later  { border-color: #34d399; color: #34d399; background: rgba(52,211,153,0.08); }
@@ -294,6 +295,11 @@
     border-bottom: 1px solid #1e293b; padding-bottom: 6px;
   }
   .tsec-hint { font-size: 12px; color: #b3c0d1; padding: 4px 2px 10px; }
+  /* sections de l'onglet Tâches (v11) : retard en rouge, jour en vert */
+  .tsec.late { color: #fb7185; border-bottom-color: #7f1d1d; }
+  .tsec.today { color: #34d399; border-bottom-color: #14532d; }
+  html.light .tsec.late { color: #be123c; border-bottom-color: #fecdd3; }
+  html.light .tsec.today { color: #047857; border-bottom-color: #a7f3d0; }
   /* toast avec bouton d'action (Annuler) */
   #toast.act { pointer-events: auto; }
   #toast button {
@@ -307,7 +313,7 @@
   html.light .badge { color: #64748b; }
   html.light .agbtn { background: #ffffff; border-color: #cbd5e1; color: #1e293b; }
   html.light .tab { background: #ffffff; border-color: #cbd5e1; color: #334155; }
-  html.light .tab.active.today { border-color: #38bdf8; color: #0369a1; background: rgba(56,189,248,0.12); }
+  html.light .tab.active.tasks { border-color: #38bdf8; color: #0369a1; background: rgba(56,189,248,0.12); }
   html.light .tab.active.urgent { border-color: #fb7185; color: #be123c; background: rgba(251,113,133,0.10); }
   html.light .tab.active.week { border-color: #fbbf24; color: #b45309; background: rgba(251,191,36,0.10); }
   html.light .tab.active.later { border-color: #34d399; color: #047857; background: rgba(52,211,153,0.10); }
@@ -368,14 +374,7 @@
   </div>
   <div id="warnCard"></div>
   <main id="list"></main>
-  <div class="data-card">
-    <div class="lbl" id="persistLbl">Les données restent sur cet appareil.</div>
-    <div class="btns">
-      <button onclick="doExport()">💾 Exporter (secours)</button>
-      <button onclick="document.getElementById('importFile').click()">📥 Importer</button>
-    </div>
-  </div>
-  <div class="data-card" id="driveCard"></div>
+  <div class="data-card" id="backupCard"></div>
 </div>
 <div id="view-agenda" class="hidden">
   <div class="ag-head">
@@ -419,7 +418,6 @@
     </div>
     <div class="flabel">🏷️ Type — l'événement agenda sera 🔴 rouge (pro) ou 🔵 bleu (perso)</div>
     <div class="cat-row type-row" id="mTypes" style="grid-template-columns:1fr 1fr"></div>
-    <div class="cat-row" id="mCats"></div>
     <div class="row">
       <button class="cancel" onclick="closeModal()">Annuler</button>
       <button class="ok" onclick="saveModal()">💾 Enregistrer (+ 📅)</button>
@@ -512,13 +510,12 @@
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v10 : UX (écran ⭐ Aujourd'hui, saisie rapide, vrai Reporter ⬅️, Annuler 5 s, pastille synchro 🔴🟠🟢, occurrence suivante des répétitions, listes : collage en lot + édition + masquer cochés + progression totale + Partager, thème clair ☀️, contraste, cibles 44 px, onglets accessibles, badge d'icône, Échap/fond = fermer, toast mise à jour SW) =====
-var APP_VERSION = "v10.1";
+// ===== Tâches & Relances — v11 : onglet unique 📋 Tâches classé par date puis horaire (plus de catégories affichées ni d'écran Aujourd'hui), carte ☁️ Sauvegarde unifiée et simplifiée =====
+var APP_VERSION = "v11";
 var KEY = "taches-relances-v2";
-var TABS = ["today", "urgent", "week", "later", "lists", "done"];
+var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
-var CAT_LABELS = { today: "⭐ Auj.", urgent: "🔴 Urgent", week: "🟠 Semaine", later: "🟢 Plus tard", lists: "🧺 Listes", done: "✅ Terminé" };
-var CAT_SHORT = { today: "Aujourd'hui", urgent: "Urgent", week: "Semaine", later: "Plus tard", done: "Terminé" };
+var CAT_LABELS = { tasks: "📋 Tâches", lists: "🧺 Listes", done: "✅ Terminé" };
 var TYPES = ["pro", "perso"];
 var TYPE_LABELS = { pro: "🔴 Pro", perso: "🔵 Perso" };
 var DRIVE_FILE_NAME = "taches-relances.json";
@@ -762,7 +759,7 @@ function storedSavedAt() {
   } catch (e) { return 0; }
 }
 var state = load();
-var tab = "today"; // accueil = écran ⭐ Aujourd'hui (retards + événements + tâches du jour)
+var tab = "tasks"; // accueil = onglet 📋 Tâches, classé par date puis horaire
 var view = "tasks";        // "tasks" | "agenda" | "list"
 var currentListId = null;  // liste ouverte en détail
 var editId = null;         // tâche éditée
@@ -992,11 +989,12 @@ function undoLast() {
   try { renderAll(); } catch (e) {}
 }
 function counts() {
-  var c = { today: 0, urgent: 0, week: 0, later: 0, done: 0, lists: state.lists.length };
+  var c = { tasks: 0, today: 0, urgent: 0, week: 0, later: 0, done: 0, lists: state.lists.length };
   var td = today();
   state.tasks.forEach(function (t) {
     if (c[t.cat] !== undefined) c[t.cat]++;
-    if (t.cat !== "done" && t.due && t.due <= td) c.today++; // retards + échéances du jour
+    if (t.cat !== "done") c.tasks++; // compteur de l'onglet 📋 Tâches
+    if (t.cat !== "done" && t.due && t.due <= td) c.today++; // badge d'icône = retards + échéances du jour
   });
   return c;
 }
@@ -1278,7 +1276,7 @@ function openList(id) {
 // ---------- Export / Import ----------
 function exportData() {
   return {
-    app: "taches-relances", version: 10, tasks: state.tasks, lists: state.lists,
+    app: "taches-relances", version: 11, tasks: state.tasks, lists: state.lists,
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     tombstones: state.tombstones || [],
     savedAt: Date.now()
@@ -2175,42 +2173,60 @@ function taskHtml(t) {
     + '<button' + (armed[t.id] ? ' class="armed"' : "") + ' title="Supprimer" onclick="onDelete(\'' + t.id + "')\">" + (armed[t.id] ? "Confirmer ?" : "🗑️") + "</button>"
     + "</div></div>";
 }
-// écran ⭐ Aujourd'hui : retards + événements du jour + tâches du jour, tout au même endroit
-function todayHtml() {
+// tri dans une journée : sans heure d'abord, puis par horaire croissant (classer par date/horaire)
+function cmpDayTime(a, b) {
+  var ta = a.startT || "00:00", tb = b.startT || "00:00";
+  if (ta !== tb) return ta < tb ? -1 : 1;
+  return String(a.title) < String(b.title) ? -1 : 1;
+}
+// onglet 📋 Tâches : retards en rouge, jour en vert, puis chaque date en chronologique, sans date à la fin
+function tasksTabHtml() {
   var td = today();
-  var late = state.tasks.filter(function (t) { return t.cat !== "done" && t.due && t.due < td; }).sort(cmpTasks);
-  var now = state.tasks.filter(function (t) { return t.cat !== "done" && t.due === td; }).sort(cmpTasks);
-  var evs = (state.agendaCache && state.agendaCache.events) || [];
-  var evToday = evs.filter(function (e) { return e.day === td || (e.until && e.day <= td && e.until >= td); });
-  var h = '<div class="dayh today"><span class="day-tag">AUJOURD\'HUI</span> ' + dayLongLabel(td) + "</div>";
+  var late = [], nowT = [], dates = [], byDate = {}, nodate = [];
+  state.tasks.forEach(function (t) {
+    if (t.cat === "done") return;
+    if (!t.due) { nodate.push(t); return; }
+    if (t.due < td) { late.push(t); return; }
+    if (t.due === td) { nowT.push(t); return; }
+    if (!byDate[t.due]) { byDate[t.due] = []; dates.push(t.due); }
+    byDate[t.due].push(t);
+  });
+  late.sort(function (a, b) {
+    if (a.due !== b.due) return a.due < b.due ? -1 : 1;
+    return cmpDayTime(a, b);
+  });
+  nowT.sort(cmpDayTime);
+  nodate.sort(cmpDayTime);
+  dates.sort();
+  var h = "";
   if (late.length > 0) {
-    h += '<div class="tsec">⚠️ En retard (' + late.length + ")</div>";
+    h += '<div class="tsec late">⚠️ En retard (' + late.length + ")</div>";
     late.forEach(function (t) { h += taskHtml(t); });
   }
-  if (evToday.length > 0) {
-    h += '<div class="tsec">📅 Événements du jour (' + evToday.length + ")</div>";
-    evToday.forEach(function (e) {
-      var time = e.allDay ? "journée" : (e.startT || "—");
-      h += '<div class="ev"><div class="ev-time">' + time + '</div><div class="ev-b"><div class="title">'
-        + (e.color === "11" ? "🔴 " : "") + esc(stripEvTitle(e.title)) + "</div>"
-        + ((e.until && e.until !== e.day) ? '<div class="meta">jusqu\'au ' + fmtDate(e.until) + "</div>" : "")
-        + "</div></div>";
-    });
+  if (nowT.length > 0) {
+    h += '<div class="tsec today">📋 Aujourd\'hui — ' + dayLongLabel(td) + " (" + nowT.length + ")</div>";
+    nowT.forEach(function (t) { h += taskHtml(t); });
   }
-  if (now.length > 0) {
-    h += '<div class="tsec">📋 À faire aujourd\'hui (' + now.length + ")</div>";
-    now.forEach(function (t) { h += taskHtml(t); });
+  var evs = (state.agendaCache && state.agendaCache.events) || [];
+  var evToday = evs.filter(function (e) { return e.day === td || (e.until && e.day <= td && e.until >= td); });
+  if (evToday.length > 0) h += '<div class="tsec-hint">📅 ' + evToday.length + " événement(s) agenda aujourd'hui — bouton 📅 en haut pour les voir.</div>";
+  dates.forEach(function (iso) {
+    h += '<div class="tsec">' + dayHeaderLabel(iso) + " (" + byDate[iso].length + ")</div>";
+    byDate[iso].sort(cmpDayTime);
+    byDate[iso].forEach(function (t) { h += taskHtml(t); });
+  });
+  if (nodate.length > 0) {
+    h += '<div class="tsec">📌 Sans date (' + nodate.length + ")</div>";
+    nodate.forEach(function (t) { h += taskHtml(t); });
   }
-  if (late.length === 0 && now.length === 0 && evToday.length === 0) {
-    h += '<div class="empty">Rien de prévu aujourd\'hui — profite 😎</div>';
-  }
-  h += '<div class="tsec-hint">⭐ Retards, événements et tâches du jour. Les tâches sans échéance restent dans leurs onglets 🔴🟠🟢.</div>';
+  if (h === "") h = '<div class="empty">Rien ici — appuie sur ＋ pour ajouter.</div>';
+  h += '<div class="tsec-hint">📋 Tout est classé par date puis horaire. Une tâche sans heure du jour passe avant celles horodatées.</div>';
   return h;
 }
 function renderTasksTab() {
   promoteOverdue();
   var el = document.getElementById("list");
-  if (tab === "lists") { el.innerHTML = listsOverviewHtml(); renderDriveCard(); return; }
+  if (tab === "lists") { el.innerHTML = listsOverviewHtml(); renderBackupCard(); return; }
   if (searchQ) {
     var res = state.tasks.filter(function (t) {
       return (String(t.title).toLowerCase().indexOf(searchQ) >= 0)
@@ -2219,30 +2235,20 @@ function renderTasksTab() {
     var h = '<div class="empty">🔎 ' + res.length + " résultat(s) pour « " + esc(searchQ) + " »</div>";
     res.forEach(function (t) { h += taskHtml(t); });
     el.innerHTML = h;
-    renderDriveCard();
+    renderBackupCard();
     return;
   }
-  if (tab === "today") { // écran Aujourd'hui : tout le jour en un coup d'œil
-    el.innerHTML = todayHtml();
-    renderDriveCard();
-    return;
-  }
-  var tasks;
   if (tab === "done") {
-    tasks = state.tasks.filter(function (t) { return t.cat === "done"; })
+    var tasks = state.tasks.filter(function (t) { return t.cat === "done"; })
       .sort(function (a, b) { return String(b.doneAt || "") < String(a.doneAt || "") ? -1 : 1; });
+    var html = "";
+    if (tasks.length === 0) html = '<div class="empty">Rien de terminé pour l\'instant.</div>';
+    else tasks.forEach(function (t) { html += taskHtml(t); });
+    el.innerHTML = html;
   } else {
-    tasks = state.tasks.filter(function (t) { return t.cat === tab; }).sort(cmpTasks);
+    el.innerHTML = tasksTabHtml(); // 📋 Tâches : classé par date puis horaire
   }
-  var html = "";
-  if (tasks.length === 0) {
-    html = '<div class="empty">' + (tab === "done" ? "Rien de terminé pour l'instant."
-      : "Rien ici — appuie sur ＋ pour ajouter.") + "</div>";
-  } else {
-    tasks.forEach(function (t) { html += taskHtml(t); });
-  }
-  el.innerHTML = html;
-  renderDriveCard();
+  renderBackupCard();
 }
 function renderWarnCard() {
   var el = document.getElementById("warnCard");
@@ -2267,31 +2273,53 @@ function hideWarnCard() {
   persist();
   renderWarnCard();
 }
-function renderDriveCard() {
-  var el = document.getElementById("driveCard");
+var persistOk = null; // stockage persistant accordé par le navigateur (affiché dans la carte ☁️)
+// carte ☁️ Sauvegarde (v11) : UN seul endroit — état clair en une ligne, réglages en « options avancées »
+function renderBackupCard() {
+  var el = document.getElementById("backupCard");
   if (!el) return;
   var cfg = state.cfg || {};
-  if (!cfg.dCid || !cfg.dRefresh) {
-    el.innerHTML = '<div class="lbl">☁️ Sauvegarde Google Drive — dossier « ' + esc(DRIVE_DEFAULT_FOLDER) + ' »</div>'
-      + '<div class="hint">Sauvegarde tes tâches et listes dans le dossier <b>' + esc(DRIVE_DEFAULT_FOLDER) + '</b> de ton Drive. '
-      + 'Réutilise le Refresh Token de l\'app Patrimoine (scope <code>https://www.googleapis.com/auth/drive.file</code>). '
-      + 'Une fois configurée, la sauvegarde devient <b>automatique</b> (30 s après chaque changement) et <b>fusionne</b> les appareils.</div>'
+  var on = !!(cfg.dCid && cfg.dRefresh);
+  var autoB = state.autoBackup !== false;
+  var status;
+  if (!on) {
+    status = '<div class="syncline"><span class="gone">⚠️ Sauvegarde sur cet appareil seulement — active Drive pour ne rien perdre.</span></div>';
+  } else if (state.syncError) {
+    status = '<div class="syncline"><span class="gone">🔴 Sauvegarde en échec — reprise automatique au prochain essai.</span></div>';
+  } else if (!state.driveSyncedAt) {
+    status = '<div class="syncline"><span class="pend">🟠 Drive connecté — première sauvegarde en attente.</span></div>';
+  } else if (typeof navigator !== "undefined" && !navigator.onLine) {
+    status = '<div class="syncline"><span class="pend">🟠 Hors ligne — tes changements partiront au retour du réseau.</span></div>';
+  } else {
+    status = '<div class="syncline"><span style="color:#34d399;font-weight:700">🟢 Tout est sauvegardé — Drive, ' + fmtAgo(state.driveSyncedAt) + '</span></div>';
+  }
+  var h = '<div class="lbl">☁️ Sauvegarde' + (on ? ' <span style="color:#64748b;font-weight:400">· auto ' + (autoB ? "✅" : "⏸️") + '</span>' : '') + '</div>' + status;
+  if (!on) {
+    h += '<div class="hint">Sauvegarde tes tâches et listes dans le dossier <b>' + esc(DRIVE_DEFAULT_FOLDER) + '</b> de ton Drive — puis c\'est automatique (30 s après chaque changement) et ça fusionne les appareils. Réutilise le Refresh Token de l\'app Patrimoine (scope <code>drive.file</code>).</div>'
       + '<input id="dCid" placeholder="Client ID Google">'
       + '<input id="dSecret" placeholder="Client Secret (optionnel)" type="password">'
       + '<input id="dRefresh" placeholder="Refresh Token (drive.file — même que Patrimoine)" type="password">'
       + '<input id="dFolder" placeholder="Nom du dossier Drive (défaut : ' + esc(DRIVE_DEFAULT_FOLDER) + ')">'
-      + '<div class="btns"><button onclick="driveSaveCfg()">💾 Enregistrer et connecter</button></div>';
-    return;
+      + '<div class="btns"><button onclick="driveSaveCfg()">💾 Enregistrer et connecter</button></div>'
+      + '<details><summary style="cursor:pointer;color:#64748b;font-size:13px;padding:6px 0">⚙️ Options avancées</summary><div class="btns">'
+      + '<button onclick="doExport()">💾 Exporter un fichier de secours</button>'
+      + '<button onclick="document.getElementById(\'importFile\').click()">📥 Importer un fichier</button>'
+      + '</div></details>';
+  } else {
+    h += '<div class="btns"><button onclick="driveBackupNow()">☁️ Sauvegarder maintenant</button></div>'
+      + '<details><summary style="cursor:pointer;color:#64748b;font-size:13px;padding:6px 0">⚙️ Options avancées</summary>'
+      + '<div class="syncline">Dossier Drive « ' + esc(cfg.dFolder || DRIVE_DEFAULT_FOLDER) + ' » — ' + esc(DRIVE_FILE_NAME) + '</div>'
+      + '<div class="btns">'
+      + '<button onclick="toggleAutoBackup()">' + (autoB ? "⏸️ Mettre la sauvegarde auto en pause" : "▶️ Réactiver la sauvegarde auto") + '</button>'
+      + '<button onclick="doExport()">💾 Exporter un fichier de secours</button>'
+      + '<button onclick="document.getElementById(\'importFile\').click()">📥 Importer un fichier</button>'
+      + '<button onclick="driveRestoreNow()">📥 Restaurer depuis Drive (remplace tout)</button>'
+      + '<button onclick="driveDisconnect()">🔌 Déconnecter Drive</button>'
+      + '</div>'
+      + (persistOk === null ? "" : '<div class="syncline">💾 ' + (persistOk ? "Stockage persistant actif sur cet appareil." : "Stockage local de cet appareil — fais un export de secours de temps en temps.") + '</div>')
+      + '</details>';
   }
-  var autoB = state.autoBackup !== false;
-  el.innerHTML = '<div class="lbl">☁️ Sauvegarde Drive : dossier « ' + esc(cfg.dFolder || DRIVE_DEFAULT_FOLDER) + ' » — ' + esc(DRIVE_FILE_NAME) + '</div>'
-    + '<div class="syncline">Dernière sauvegarde : ' + fmtAgo(state.driveSyncedAt) + " · Sauvegarde auto : " + (autoB ? "✅ ON" : "❌ OFF") + "</div>"
-    + '<div class="btns">'
-    + '<button onclick="driveBackupNow()">☁️ Sauvegarder maintenant</button>'
-    + '<button onclick="toggleAutoBackup()">' + (autoB ? "⏸️ Désactiver l'auto" : "▶️ Activer l'auto") + "</button>"
-    + '<button onclick="driveRestoreNow()">📥 Restaurer (remplace tout)</button>'
-    + '<button onclick="driveDisconnect()">Déconnecter</button>'
-    + "</div>";
+  el.innerHTML = h;
 }
 function listCardHtml(l, isSub) {
   var kids = state.lists.filter(function (c) { return c.parent === l.id; });
@@ -2587,7 +2615,7 @@ function quickSave() {
   var title = (document.getElementById("qTitle").value || "").trim();
   if (!title) { showToast("⚠️ Donne un titre à la tâche"); return; }
   var due = quickDueIso();
-  var cat = due ? catForDate(due) : ((CATS.indexOf(tab) >= 0) ? tab : "urgent"); // catégorie déduite de la date
+  var cat = due ? catForDate(due) : "later"; // v11 : la DATE classe la tâche ; sans date → « Sans date » (catégorie interne later)
   var chk = document.getElementById("qAgenda");
   var wantAgenda = !!(chk && chk.checked && due);
   if (chk) state.cfg = Object.assign({}, state.cfg || {}, { quickAgenda: chk.checked === true }); // choix mémorisé
@@ -2699,13 +2727,7 @@ function updateBadge() {
 }
 
 // ---------- Modale tâche ----------
-function renderCats() {
-  var html = "";
-  ["urgent", "week", "later"].forEach(function (k) {
-    html += '<label id="lbl-' + k + '" onclick="pickCat(\'' + k + "')\"><input type=\"radio\" name=\"mCat\" id=\"mCat-" + k + '" value="' + k + '"><span>' + CAT_SHORT[k] + "</span></label>";
-  });
-  document.getElementById("mCats").innerHTML = html;
-  pickCat("urgent");
+function renderCats() { // v11 : plus de boutons de catégorie — la date classe la tâche (types pro/perso conservés)
   renderTypes();
 }
 function renderTypes() {
@@ -2724,14 +2746,6 @@ function pickType(k) {
     if (l) l.className = (c === k) ? "on" : "";
   });
 }
-function pickCat(k) {
-  ["urgent", "week", "later"].forEach(function (c) {
-    var r = document.getElementById("mCat-" + c);
-    var l = document.getElementById("lbl-" + c);
-    if (r) r.checked = (c === k);
-    if (l) l.className = (c === k) ? "on" : "";
-  });
-}
 function openModal(id) {
   editId = id || null;
   var t = editId ? getTask(editId) : null;
@@ -2746,9 +2760,6 @@ function openModal(id) {
   document.getElementById("mRepEvery").value = (t && t.rep && t.rep.every) ? t.rep.every : "";
   document.getElementById("mRepCount").value = (t && t.rep && t.rep.count) ? t.rep.count : "";
   onRepChange();
-  var defaultCat = t ? t.cat : ((tab === "urgent" || tab === "week" || tab === "later") ? tab : "urgent");
-  if (defaultCat === "done" || defaultCat === "lists") defaultCat = "urgent";
-  pickCat(defaultCat);
   pickType(t ? (t.type === "pro" ? "pro" : "perso") : "perso");
   document.getElementById("modal").className = "modal";
 }
@@ -2785,11 +2796,8 @@ function saveModal(autoSync) {
   if (startT && endT && endT <= startT) { showToast("⚠️ L'heure de fin doit être après l'heure de début"); return null; }
   var rep = readRepModal();
   if (rep && rep.mode === "ndays" && !rep.every) { showToast("⚠️ Indique « tous les combien de jours » (2, 3…)"); return null; }
-  var cat = "urgent";
-  ["urgent", "week", "later"].forEach(function (c) {
-    var r = document.getElementById("mCat-" + c);
-    if (r && r.checked) cat = c;
-  });
+  var t0 = editId ? getTask(editId) : null;
+  var cat = due ? catForDate(due) : (t0 ? t0.cat : "later"); // v11 : la DATE classe la tâche (catégorie interne déduite, plus de boutons)
   var type = "perso";
   TYPES.forEach(function (c) {
     var r = document.getElementById("mType-" + c);
@@ -2891,10 +2899,8 @@ if (typeof document !== "undefined" && document.addEventListener) {
 }
 if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().then(function (ok) {
-    var lbl = document.getElementById("persistLbl");
-    if (lbl) lbl.textContent = ok
-      ? "💾 Sauvegarde automatique sur cet appareil (stockage persistant actif)."
-      : "💾 Sauvegarde automatique sur cet appareil. Fais un export régulier par sécurité.";
+    persistOk = ok; // affiché dans la carte ☁️ (options avancées)
+    try { renderBackupCard(); } catch (e) {}
   }).catch(function () {});
 }
 if ('serviceWorker' in navigator) {
