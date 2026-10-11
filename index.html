@@ -531,8 +531,8 @@
 <script>
 "use strict";
 
-// ===== Tâches & Relances — v16.2 (demande Jade : « synchronise directement, le bouton reste en cas de sécurité ») : synchro agenda AUTOMATIQUE — rafraîchissement silencieux dès que le cache dépasse 5 min, heartbeat 1 min tant que l'app est ouverte au premier plan (jamais en arrière-plan : le retour au premier plan resynchro déjà), verrou anti-chevauchement agendaAutoBusy, garde 1 essai/min conservée, bouton 🔄 Actualiser CONSERVÉ en secours =====
-var APP_VERSION = "v16.2";
+// ===== Tâches & Relances — v16.3 (demande Jade : « quand je retire une tâche, je veux synchronisation immédiate ») : supprimer une tâche supprime AUSSI son événement Google Agenda immédiatement — y compris les tâches importées (avant : l'événement restait dans l'agenda et sa rangée revenait à l'écran au rafraîchissement) ; la rangée disparaît de l'app sans attendre le 🔄 ; l'Annuler 5 s reste fiable même quand le DELETE Google a déjà réussi =====
+var APP_VERSION = "v16.3";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -1018,19 +1018,36 @@ function deleteTask(id) {
   if (n > 0) {
     addTombstone(id, "task"); // pierre tombale : la suppression se propage aux autres appareils
     delete _shadow[id]; // v13 : recréer ce même id (annulation, nouveau ＋ sur un « ev-… ») repart d'un updatedAt tout neuf
-    // la tâche avait créé un événement agenda → on le retire aussi (les tâches importées de l'agenda n'y touchent pas)
-    if (t && t.gEventId && !t.autoImport && !t.rep) agendaDeleteEvent(t.gEventId, t.title); // v12 : une tâche répétée ne supprime JAMAIS l'événement maître de la série
+    // v16.3 : supprimer une tâche retire AUSSI son événement Google Agenda, immédiatement — y compris les
+    // importées (demande Jade : « je veux synchronisation immédiate »). Avant, l'événement d'une importée
+    // restait dans l'agenda : sa rangée revenait à l'écran au rafraîchissement, la synchro paraissait cassée.
+    var evDelP = null; // la promesse du DELETE Google — elle dicte ce que l'Annuler 5 s doit défaire
+    if (t && t.gEventId && !t.autoImport && !t.rep) evDelP = agendaDeleteEvent(t.gEventId, t.title); // v12 : une tâche répétée ne supprime JAMAIS l'événement maître de la série
     else if (t && t.rep && t.gEventId && !t.autoImport && String(t.gEventId).indexOf("_") < 0) {
       // v13 : l'inverse du garde v12 — supprimer le MAÎTRE d'une série doit demander : la série Google reste-t-elle
       // dans l'agenda ? Sans question, l'import auto ramenait ses occurrences en tâches juste après.
       var okDel = (typeof confirm === "function") ? confirm("Supprimer aussi la série « " + t.title + " » dans Google Agenda ?\nOK = la série part de l'agenda aussi · Annuler = elle y reste.") : false;
-      if (okDel) agendaDeleteEvent(t.gEventId, t.title);
+      if (okDel) evDelP = agendaDeleteEvent(t.gEventId, t.title);
+    } else if (t && t.autoImport && t.gEventId) {
+      // v16.3 : tâche importée de l'agenda → son événement part AUSSI. L'import auto ne le ressuscitera
+      // pas (la trace d'import reste) ; les occurrences de séries (« _ ») restent protégées (info affichée).
+      evDelP = agendaDeleteEvent(t.gEventId, t.title);
     }
     save();
     _undo = { kind: "delete", snap: snapshotTask(t) };
     showToast("🗑️ Tâche supprimée", { action: "Annuler", ttl: 5000 });
+    if (evDelP) evDelP.then(function (ok) { // v16.3 : le DELETE Google a abouti — l'Annuler doit rester fiable
+      if (!ok) return; // échec réseau : déjà en file (pendingEventDeletes), l'Annuler annulera la file aussi
+      if (getTask(id)) { removeImportTrace163(id); persist(); } // l'Annuler a déjà restauré la tâche (course) : sans retrait de la trace, le prochain balayage re-tuerait la tâche restaurée
+      else if (_undo && _undo.kind === "delete" && _undo.snap && _undo.snap.id === id) _undo.evDeleted = true; // un Annuler dans les 5 s retirera la trace
+    });
   }
   return n > 0;
+}
+function removeImportTrace163(taskId) { // v16.3 : trace d'import retirée quand l'événement Google est réellement parti — une trace sur un événement mort ferait re-tuer une tâche restaurée au prochain balayage
+  Object.keys(state.importedEvents || {}).forEach(function (k) {
+    if (state.importedEvents[k] && state.importedEvents[k].taskId === taskId) delete state.importedEvents[k];
+  });
 }
 // bouton « Annuler » du toast (5 s) : restaure le dernier ✓ ou 🗑️
 function undoLast() {
@@ -1055,12 +1072,11 @@ function undoLast() {
       // v12 : une suppression d'événement encore en attente ne doit pas être rejouée sur la tâche restaurée
       state.pendingEventDeletes = (state.pendingEventDeletes || []).filter(function (e) { return e !== u.snap.gEventId; });
     }
-    if (u.syncKill && u.snap.autoImport) {
-      // v14 : la suppression venait de l'agenda (l'événement d'origine n'existe plus chez Google) — la trace
-      // d'import est retirée pour que la tâche restaurée vive sa vie locale sans être re-marquée au prochain balayage
-      Object.keys(state.importedEvents || {}).forEach(function (k) {
-        if (state.importedEvents[k] && state.importedEvents[k].taskId === u.snap.id) delete state.importedEvents[k];
-      });
+    if ((u.syncKill || u.evDeleted) && u.snap.autoImport) {
+      // v14 : la suppression venait de l'agenda ; v16.3 : ou l'événement Google a bien été supprimé avec la
+      // tâche (evDeleted) — la trace d'import est retirée pour que la tâche restaurée vive sa vie locale
+      // sans être re-tuée au prochain balayage (la preuve 404/cancelled tomberait sinon)
+      removeImportTrace163(u.snap.id);
     }
     save();
     if (u.snap.gEventId && !u.snap.autoImport && String(u.snap.gEventId).indexOf("_") < 0 && state.cfg && state.cfg.cid && state.cfg.refresh) taskToEvent(u.snap.id); // l'événement est recréé au besoin (404 → recréation)
@@ -1373,7 +1389,7 @@ function keepLocalSecrets(merged, oldList) { // v15 : réinjecte les codes 🔐 
 }
 function exportData() {
   return {
-    app: "taches-relances", version: 16.2, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version >= 16 = marqueur de rotation Drive (les fichiers v16+ n'ont plus de codes 🔐 dans leur historique)
+    app: "taches-relances", version: 16.3, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version >= 16 = marqueur de rotation Drive (les fichiers v16+ n'ont plus de codes 🔐 dans leur historique)
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     tombstones: state.tombstones || [],
     savedAt: Date.now()
@@ -1891,7 +1907,10 @@ function taskToEvent(id) {
 function agendaDeleteEvent(evId, title, silent) {
   var cfg = state.cfg;
   if (!cfg || !cfg.cid || !cfg.refresh || !evId) return Promise.resolve(false);
-  if (String(evId).indexOf("_") >= 0) return Promise.resolve(false); // instance récurrente : on n'y touche pas
+  if (String(evId).indexOf("_") >= 0) { // instance récurrente : on n'y touche pas
+    if (!silent) showToast("ℹ️ Occurrence d'une série — la série reste dans l'agenda (modifie-la dans Google Agenda)"); // v16.3 : plus de refus muet — la tâche part, la série Google reste
+    return Promise.resolve(false);
+  }
   return agendaAccessToken(cfg).then(function (at) {
     return fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(evId), {
       method: "DELETE",
@@ -1900,7 +1919,13 @@ function agendaDeleteEvent(evId, title, silent) {
   }).then(function (r) {
     if (r.status !== 200 && r.status !== 204) throw new Error("delete refusé");
     state.pendingEventDeletes = (state.pendingEventDeletes || []).filter(function (e) { return e !== evId; });
+    var gone163 = false; // v16.3 : le cache local suit le DELETE — la rangée disparaît de l'app (Agenda, Aujourd'hui) sans attendre le rafraîchissement
+    if (state.agendaCache && state.agendaCache.events && state.agendaCache.events.some(function (e) { return e.id === evId; })) {
+      state.agendaCache.events = state.agendaCache.events.filter(function (e) { return e.id !== evId; });
+      gone163 = true;
+    }
     persist();
+    if (gone163) { try { renderAll(); } catch (e163) {} }
     if (!silent) showToast("🗑️ Événement retiré de l'agenda" + (title ? " : « " + title + " »" : ""));
     return true;
   }).catch(function () {
