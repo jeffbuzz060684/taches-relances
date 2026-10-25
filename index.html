@@ -608,7 +608,7 @@
 "use strict";
 
 // ===== Tâches & Relances — v17 (demande Jade : « 1, 2, 3 sans oublier toutes les synchros et modifications dans les 2 sens ») : relances Google Calendar pilotées depuis l'app (poussées ET tirées, PATCH couleur+relances SEULES pour les importées), PATCH au lieu de PUT (lieu/invités/description/relances réglés dans Google ne sont plus écrasés au push des liées), DELETE 404/410 = succès, timeout 20 s sur TOUS les fetch agenda, synchro auto 2 min + toast ⚡ quand elle change quelque chose, la note suit la description Google dans les 2 sens =====
-var APP_VERSION = "v18.7";
+var APP_VERSION = "v18.8";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -3782,6 +3782,31 @@ if ('serviceWorker' in navigator) {
   setInterval(function () {
     try { navigator.serviceWorker.getRegistration().then(function (r) { if (r) r.update(); }).catch(function () {}); } catch (e) {}
   }, 120000);
+  // v18.8 : verif INDEPENDANTE du service worker — l'app lit sw.js sur le reseau et compare la version.
+  // Si le serveur est plus recent : rechargement (1 fois par session et par version — garde-fou anti-boucle).
+  var _v188done = {};
+  function checkNewVer188() {
+    fetch('sw.js', { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) {
+      var m = t && t.match(/taches-relances-v([0-9.]+)/);
+      if (!m) return;
+      var remote = 'v' + m[1];
+      if (remote === APP_VERSION) return;
+      if (_v188done[remote]) { // deja rechargé pour cette version et encore ancien → le service worker d'Opera n'a pas suivi : message clair au lieu d'une boucle
+        try { showToast('🔄 Version ' + remote + ' disponible — ⋮ → Actualiser, ou ferme/rouvre l\'app'); } catch (e) {}
+        return;
+      }
+      _v188done[remote] = true;
+      try { showToast('🔄 Nouvelle version ' + remote + ' — rechargement…'); } catch (e) {}
+      setTimeout(function () { try { location.reload(); } catch (e) {} }, 900);
+    }).catch(function () {});
+  }
+  addEventListener('load', function () { setTimeout(checkNewVer188, 2500); });
+  setInterval(checkNewVer188, 120000);
+  if (typeof document !== "undefined" && document.addEventListener) {
+    document.addEventListener("visibilitychange", function () {
+      try { if (typeof document.hidden !== "undefined" && !document.hidden) setTimeout(checkNewVer188, 1500); } catch (e) {}
+    });
+  }
   navigator.serviceWorker.addEventListener('controllerchange', function () {
     if (_hadSW) { // v18.3 : nouvelle version deja installee en arriere-plan → recharge tout seul (l'ancien code demandait un rechargement manuel, jamais fait)
       try { showToast("🔄 Nouvelle version installée — rechargement…"); } catch (e) {}

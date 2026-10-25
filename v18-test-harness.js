@@ -105,10 +105,12 @@ function cleanState163() { // isolation entre sections
 
 async function main() {
   // ===== Section 0 : versions et sources =====
-  eq(APP_VERSION, 'v18.7', 'APP_VERSION v18.7');
+  eq(APP_VERSION, 'v18.8', 'APP_VERSION v18.8');
   ok(exportData().version === 17, 'exportData version 17 (format Drive inchangé en v18)');
-  has(html, 'var APP_VERSION = "v18.7"', 'source : APP_VERSION v18.7');
-  has(swSrc, "const CACHE = 'taches-relances-v18.7'", 'sw : cache renomme v18.7 (exact)');
+  has(html, 'var APP_VERSION = "v18.8"', 'source : APP_VERSION v18.8');
+  has(swSrc, "const CACHE = 'taches-relances-v18.8'", 'sw : cache renomme v18.8 (exact)');
+  has(html, 'checkNewVer188', 'v18.8 : verif INDEPENDANTE du SW — l app lit sw.js et compare la version, rechargement si plus recent');
+  has(html, "cache: 'no-store'", 'v18.8 : lecture reseau sans cache HTTP (evite le CDN qui sert une vieille copie)');
   has(html, 'r.update()', 'v18.6 : mise a jour ACTIVE — l app demande les nouveautes (retour premier plan + toutes les 2 min)');
   has(html, 'visibilitychange', 'v18.6 : update au retour au premier plan');
   has(html, 'location.reload()', 'v18.3 : nouvelle version → rechargement automatique (fini le rechargement manuel)');
