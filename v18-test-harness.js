@@ -105,11 +105,15 @@ function cleanState163() { // isolation entre sections
 
 async function main() {
   // ===== Section 0 : versions et sources =====
-  eq(APP_VERSION, 'v18.3', 'APP_VERSION v18.3');
+  eq(APP_VERSION, 'v18.4', 'APP_VERSION v18.4');
   ok(exportData().version === 17, 'exportData version 17 (format Drive inchangé en v18)');
-  has(html, 'var APP_VERSION = "v18.3"', 'source : APP_VERSION v18.3');
-  has(swSrc, "const CACHE = 'taches-relances-v18.3'", 'sw : cache renomme v18.3 (exact)');
+  has(html, 'var APP_VERSION = "v18.4"', 'source : APP_VERSION v18.4');
+  has(swSrc, "const CACHE = 'taches-relances-v18.4'", 'sw : cache renomme v18.4 (exact)');
   has(html, 'location.reload()', 'v18.3 : nouvelle version → rechargement automatique (fini le rechargement manuel)');
+  has(html, 'for="photoCam"', 'v18.4 : bouton appareil photo = LABEL natif (plus de click() programme)');
+  has(html, 'for="photoGal"', 'v18.4 : bouton galerie/fichiers = LABEL natif');
+  ok(html.indexOf("photoCam').click()") < 0 && html.indexOf("photoGal').click()") < 0, 'v18.4 : plus AUCUN click() programme sur les entrees fichier');
+  has(html, 'addEventListener("error"', 'v18.4 : anti-erreur muette — toute erreur JS devient un toast visible');
   ok(swSrc.indexOf('taches-relances-v17') < 0, 'sw : plus de reference v17');
   ok(swSrc.indexOf('taches-relances-v16.4') < 0, 'sw : plus de reference v16.4');
   has(html, 'id="eTypes"', 'source : rangee type dans la modale evenement');
