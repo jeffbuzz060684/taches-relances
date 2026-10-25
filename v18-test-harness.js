@@ -1,6 +1,7 @@
-// ===== Harnais de test v18 — « Photo → liste » (OCR Tesseract.js sur l'appareil) =====
+// ===== Harnais de test v18.1 — « Photo → liste » (OCR Tesseract.js sur l'appareil) =====
 // Base v17 (136 assertions conservées) + Section 18 v18 : ocrLines, boutons photo, création de
 // liste depuis une photo, ajout à une liste cible, quantités « 4x » parsées, toggle, modale.
+// v18.1 : deux entrées (appareil photo + galerie/fichiers), boutons distincts, entrées hors écran.
 const fs = require('fs');
 const vm = require('vm');
 
@@ -101,10 +102,10 @@ function cleanState163() { // isolation entre sections
 
 async function main() {
   // ===== Section 0 : versions et sources =====
-  eq(APP_VERSION, 'v18', 'APP_VERSION v18');
+  eq(APP_VERSION, 'v18.1', 'APP_VERSION v18.1');
   ok(exportData().version === 17, 'exportData version 17 (format Drive inchangé en v18)');
-  has(html, 'var APP_VERSION = "v18"', 'source : APP_VERSION v18');
-  has(swSrc, "taches-relances-v18", 'sw : cache renomme v18');
+  has(html, 'var APP_VERSION = "v18.1"', 'source : APP_VERSION v18.1');
+  has(swSrc, "const CACHE = 'taches-relances-v18.1'", 'sw : cache renomme v18.1 (exact)');
   ok(swSrc.indexOf('taches-relances-v17') < 0, 'sw : plus de reference v17');
   ok(swSrc.indexOf('taches-relances-v16.4') < 0, 'sw : plus de reference v16.4');
   has(html, 'id="eTypes"', 'source : rangee type dans la modale evenement');
@@ -528,9 +529,13 @@ async function main() {
 
   // ===== Section 18 : v18 — Photo → liste =====
   cleanState163();
-  ['photoModal','pLabel','pHint','pName','pNameWrap','pResults','pProgWrap','pProgTxt','pShoot','pCancelRow','pLines','pOkBtn','photoFile'].forEach(function (id) { document.getElementById(id); }); // stubs pre-crees (acces directs)
+  ['photoModal','pLabel','pHint','pName','pNameWrap','pResults','pProgWrap','pProgTxt','pShootCam','pShootGal','pCancelRow','pLines','pOkBtn','photoCam','photoGal'].forEach(function (id) { document.getElementById(id); }); // stubs pre-crees (acces directs)
   has(html, 'id="photoModal"', 'v18 source : feuille photo presente');
   has(html, 'capture="environment"', 'v18 source : l input photo ouvre l appareil photo');
+  has(html, 'id="photoCam"', 'v18.1 : entree appareil photo');
+  has(html, 'id="photoGal"', 'v18.1 : entree galerie/fichiers SANS capture (Android laisse le choix)');
+  has(html, 'left:-9999px', 'v18.1 : entrees hors ecran (jamais display:none — refuse de cliquer sur mobile)');
+  has(html, 'pShootGal', 'v18.1 : bouton galerie/fichiers distinct');
   has(html, 'cdn.jsdelivr.net/npm/tesseract.js@5', 'v18 source : Tesseract.js charge a la demande');
   has(html, 'try { closePhotoModal(); } catch', 'v18 source : la feuille photo se ferme avec les autres');
   eq(ocrLines('').length, 0, 'ocrLines : texte vide = aucune ligne');
@@ -573,6 +578,8 @@ async function main() {
   ok(els['pOkBtn'].textContent.indexOf('1 élément') >= 0, 'v18 : le bouton ne compte que les lignes gardees');
   openPhotoModal();
   eq(els['pNameWrap'].className, '', 'v18 : nouvelle liste → champ nom visible');
+  eq(els['pShootCam'].className, 'bigphoto', 'v18.1 : bouton appareil photo visible a l ouverture');
+  eq(els['pShootGal'].className, 'bigphoto alt', 'v18.1 : bouton galerie/fichiers visible a l ouverture');
   openPhotoModal(lP18.id);
   eq(els['pNameWrap'].className, 'hidden', 'v18 : liste cible → champ nom masque');
   ok(els['pLabel'].textContent.indexOf('Liste photo') >= 0, 'v18 : le titre vise la liste cible');
@@ -589,4 +596,5 @@ async function main() {
   if (FAILS.length > 0) process.exit(1);
 }
 main().catch(function (e) { console.error('ERREUR FATALE : ' + (e && e.stack || e)); process.exit(1); });
+
 
