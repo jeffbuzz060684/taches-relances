@@ -2,6 +2,9 @@
 // Base v17 (136 assertions conservées) + Section 18 v18 : ocrLines, boutons photo, création de
 // liste depuis une photo, ajout à une liste cible, quantités « 4x » parsées, toggle, modale.
 // v18.1 : deux entrées (appareil photo + galerie/fichiers), boutons distincts, entrées hors écran.
+// v18.2 : correction du crash openPhotoModal (reste v18 : getElementById("pShoot") alors que l'id
+//         n'existait plus) + NOUVEAU test de cohérence : tout getElementById("id") littéral du code
+//         doit correspondre à un id="..." défini dans la page (Section 19).
 const fs = require('fs');
 const vm = require('vm');
 
@@ -102,10 +105,10 @@ function cleanState163() { // isolation entre sections
 
 async function main() {
   // ===== Section 0 : versions et sources =====
-  eq(APP_VERSION, 'v18.1', 'APP_VERSION v18.1');
+  eq(APP_VERSION, 'v18.2', 'APP_VERSION v18.2');
   ok(exportData().version === 17, 'exportData version 17 (format Drive inchangé en v18)');
-  has(html, 'var APP_VERSION = "v18.1"', 'source : APP_VERSION v18.1');
-  has(swSrc, "const CACHE = 'taches-relances-v18.1'", 'sw : cache renomme v18.1 (exact)');
+  has(html, 'var APP_VERSION = "v18.2"', 'source : APP_VERSION v18.2');
+  has(swSrc, "const CACHE = 'taches-relances-v18.2'", 'sw : cache renomme v18.2 (exact)');
   ok(swSrc.indexOf('taches-relances-v17') < 0, 'sw : plus de reference v17');
   ok(swSrc.indexOf('taches-relances-v16.4') < 0, 'sw : plus de reference v16.4');
   has(html, 'id="eTypes"', 'source : rangee type dans la modale evenement');
@@ -586,6 +589,17 @@ async function main() {
   closePhotoModal();
   eq(els['photoModal'].className, 'modal hidden', 'v18 : fermeture de la feuille photo');
   photoTargetList = null;
+
+  // ===== Section 19 : v18.2 — cohérence des ids (leçon pShoot : getElementById sur un id inexistant = crash muet en vrai navigateur) =====
+  var defIds19 = {};
+  var mDef19; var reDef19 = /id="([A-Za-z0-9_\-]+)"/g;
+  while ((mDef19 = reDef19.exec(html))) defIds19[mDef19[1]] = true;
+  var orphans19 = []; var seen19 = {}; var mRef19; var reRef19 = /getElementById\("([A-Za-z0-9_\-]+)"\)/g;
+  while ((mRef19 = reRef19.exec(html))) {
+    if (!seen19[mRef19[1]]) { seen19[mRef19[1]] = true; if (!defIds19[mRef19[1]]) orphans19.push(mRef19[1]); }
+  }
+  ok(orphans19.length === 0, 'v18.2 : tout getElementById littéral vise un id défini (orphelins : ' + (orphans19.join(', ') || 'aucun') + ')');
+  ok(html.indexOf('getElementById("pShoot")') < 0, 'v18.2 : plus aucune reference au vieux bouton pShoot');
 
   // ===== Menage =====
   clearTimeout(driveTimer);
