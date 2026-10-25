@@ -105,13 +105,14 @@ function cleanState163() { // isolation entre sections
 
 async function main() {
   // ===== Section 0 : versions et sources =====
-  eq(APP_VERSION, 'v18.4', 'APP_VERSION v18.4');
+  eq(APP_VERSION, 'v18.5', 'APP_VERSION v18.5');
   ok(exportData().version === 17, 'exportData version 17 (format Drive inchangé en v18)');
-  has(html, 'var APP_VERSION = "v18.4"', 'source : APP_VERSION v18.4');
-  has(swSrc, "const CACHE = 'taches-relances-v18.4'", 'sw : cache renomme v18.4 (exact)');
+  has(html, 'var APP_VERSION = "v18.5"', 'source : APP_VERSION v18.5');
+  has(swSrc, "const CACHE = 'taches-relances-v18.5'", 'sw : cache renomme v18.5 (exact)');
   has(html, 'location.reload()', 'v18.3 : nouvelle version → rechargement automatique (fini le rechargement manuel)');
-  has(html, 'for="photoCam"', 'v18.4 : bouton appareil photo = LABEL natif (plus de click() programme)');
-  has(html, 'for="photoGal"', 'v18.4 : bouton galerie/fichiers = LABEL natif');
+  has(html, 'opacity:0;cursor:pointer', 'v18.5 : entree fichier invisible POSEE sur le bouton (tap direct sur l input — fiable sur Opera et tous navigateurs)');
+  ok(html.indexOf('left:-9999px') < 0, 'v18.5 : plus d entree hors ecran (Opera n active pas un input hors de la vue)');
+  ok(html.indexOf('for="photoCam"') < 0 && html.indexOf('for="photoGal"') < 0, 'v18.5 : plus de label for — l input est DANS le label');
   ok(html.indexOf("photoCam').click()") < 0 && html.indexOf("photoGal').click()") < 0, 'v18.4 : plus AUCUN click() programme sur les entrees fichier');
   has(html, 'addEventListener("error"', 'v18.4 : anti-erreur muette — toute erreur JS devient un toast visible');
   ok(swSrc.indexOf('taches-relances-v17') < 0, 'sw : plus de reference v17');
@@ -542,7 +543,7 @@ async function main() {
   has(html, 'capture="environment"', 'v18 source : l input photo ouvre l appareil photo');
   has(html, 'id="photoCam"', 'v18.1 : entree appareil photo');
   has(html, 'id="photoGal"', 'v18.1 : entree galerie/fichiers SANS capture (Android laisse le choix)');
-  has(html, 'left:-9999px', 'v18.1 : entrees hors ecran (jamais display:none — refuse de cliquer sur mobile)');
+  has(html, 'position:absolute;left:0;top:0;width:100%;height:100%;opacity:0', 'v18.5 : overlay input sur TOUTE la surface du bouton (Section 18)');
   has(html, 'pShootGal', 'v18.1 : bouton galerie/fichiers distinct');
   has(html, 'cdn.jsdelivr.net/npm/tesseract.js@5', 'v18 source : Tesseract.js charge a la demande');
   has(html, 'try { closePhotoModal(); } catch', 'v18 source : la feuille photo se ferme avec les autres');

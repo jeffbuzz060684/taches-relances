@@ -128,7 +128,7 @@
     font-weight: 700; border-radius: 10px; padding: 9px 12px; font-size: 13px; cursor: pointer; font-family: inherit;
   }
   .bigphoto {
-    display: block; width: 100%; margin: 12px 0 4px;
+    display: block; width: 100%; margin: 12px 0 4px; position: relative; /* v18.5 : relative → l'input invisible posé dessus couvre tout le bouton */
     background: #a78bfa; color: #020617; font-weight: 700; font-size: 15px;
     border: none; border-radius: 12px; padding: 13px; cursor: pointer; font-family: inherit;
   }
@@ -497,10 +497,8 @@
   <div class="sheet">
     <div class="st" id="pLabel">📷 Photo → nouvelle liste</div>
     <div class="flabel" id="pHint">Photographie un document écrit (liste papier, inventaire, note…) — l'app lit le texte et crée la liste toute seule : une ligne = un élément.</div>
-    <input type="file" id="photoCam" accept="image/*" capture="environment" onchange="photoPicked(event)" style="position:fixed;left:-9999px;top:0">
-    <input type="file" id="photoGal" accept="image/*" onchange="photoPicked(event)" style="position:fixed;left:-9999px;top:0">
-    <label for="photoCam" class="bigphoto" id="pShootCam">📸 Prendre une photo</label><!-- v18.4 : LABEL natif — le navigateur ouvre l'appareil photo lui-même, plus aucun click() programmé (refusé silencieusement sur certains mobiles) -->
-    <label for="photoGal" class="bigphoto alt" id="pShootGal">🖼️ Choisir une image (galerie / fichiers)</label><!-- v18.4 : idem pour la galerie/fichiers -->
+    <label class="bigphoto" id="pShootCam">📸 Prendre une photo<input type="file" id="photoCam" accept="image/*" capture="environment" onchange="photoPicked(event)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label><!-- v18.5 : l'entrée fichier COUVRE le bouton (invisible) — le tap atteint l'input lui-même, zéro activation indirecte ; fiable sur tous navigateurs dont Opera -->
+    <label class="bigphoto alt" id="pShootGal">🖼️ Choisir une image (galerie / fichiers)<input type="file" id="photoGal" accept="image/*" onchange="photoPicked(event)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label><!-- v18.5 : idem pour la galerie/fichiers -->
     <div id="pProgWrap" class="hidden">
       <div class="flabel" id="pProgTxt">Lecture du document…</div>
       <div id="photoProg"><div></div></div>
@@ -611,7 +609,7 @@
 "use strict";
 
 // ===== Tâches & Relances — v17 (demande Jade : « 1, 2, 3 sans oublier toutes les synchros et modifications dans les 2 sens ») : relances Google Calendar pilotées depuis l'app (poussées ET tirées, PATCH couleur+relances SEULES pour les importées), PATCH au lieu de PUT (lieu/invités/description/relances réglés dans Google ne sont plus écrasés au push des liées), DELETE 404/410 = succès, timeout 20 s sur TOUS les fetch agenda, synchro auto 2 min + toast ⚡ quand elle change quelque chose, la note suit la description Google dans les 2 sens =====
-var APP_VERSION = "v18.4";
+var APP_VERSION = "v18.5";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
