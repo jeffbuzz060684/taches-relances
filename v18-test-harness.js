@@ -105,10 +105,10 @@ function cleanState163() { // isolation entre sections
 
 async function main() {
   // ===== Section 0 : versions et sources =====
-  eq(APP_VERSION, 'v18.6', 'APP_VERSION v18.6');
+  eq(APP_VERSION, 'v18.7', 'APP_VERSION v18.7');
   ok(exportData().version === 17, 'exportData version 17 (format Drive inchangé en v18)');
-  has(html, 'var APP_VERSION = "v18.6"', 'source : APP_VERSION v18.6');
-  has(swSrc, "const CACHE = 'taches-relances-v18.6'", 'sw : cache renomme v18.6 (exact)');
+  has(html, 'var APP_VERSION = "v18.7"', 'source : APP_VERSION v18.7');
+  has(swSrc, "const CACHE = 'taches-relances-v18.7'", 'sw : cache renomme v18.7 (exact)');
   has(html, 'r.update()', 'v18.6 : mise a jour ACTIVE — l app demande les nouveautes (retour premier plan + toutes les 2 min)');
   has(html, 'visibilitychange', 'v18.6 : update au retour au premier plan');
   has(html, 'location.reload()', 'v18.3 : nouvelle version → rechargement automatique (fini le rechargement manuel)');
@@ -116,6 +116,7 @@ async function main() {
   ok(html.indexOf('left:-9999px') < 0, 'v18.5 : plus d entree hors ecran (Opera n active pas un input hors de la vue)');
   ok(html.indexOf('for="photoCam"') < 0 && html.indexOf('for="photoGal"') < 0, 'v18.5 : plus de label for — l input est DANS le label');
   ok(html.indexOf("photoCam').click()") < 0 && html.indexOf("photoGal').click()") < 0, 'v18.4 : plus AUCUN click() programme sur les entrees fichier');
+  ok(html.indexOf('id="photoCam"') < 0 && html.indexOf('id="pShootCam"') < 0 && html.indexOf('capture=') < 0, 'v18.7 : bouton caméra RETIRE (demande Jade — appareil photo via navigateur cassé dans Opera) : plus ni photoCam ni pShootCam ni capture');
   has(html, 'addEventListener("error"', 'v18.4 : anti-erreur muette — toute erreur JS devient un toast visible');
   ok(swSrc.indexOf('taches-relances-v17') < 0, 'sw : plus de reference v17');
   ok(swSrc.indexOf('taches-relances-v16.4') < 0, 'sw : plus de reference v16.4');
@@ -540,11 +541,9 @@ async function main() {
 
   // ===== Section 18 : v18 — Photo → liste =====
   cleanState163();
-  ['photoModal','pLabel','pHint','pName','pNameWrap','pResults','pProgWrap','pProgTxt','pShootCam','pShootGal','pCancelRow','pLines','pOkBtn','photoCam','photoGal'].forEach(function (id) { document.getElementById(id); }); // stubs pre-crees (acces directs)
+  ['photoModal','pLabel','pHint','pName','pNameWrap','pResults','pProgWrap','pProgTxt','pShootGal','pCancelRow','pLines','pOkBtn','photoGal'].forEach(function (id) { document.getElementById(id); }); // stubs pre-crees (acces directs) — v18.7 : pShootCam/photoCam retires
   has(html, 'id="photoModal"', 'v18 source : feuille photo presente');
-  has(html, 'capture="environment"', 'v18 source : l input photo ouvre l appareil photo');
-  has(html, 'id="photoCam"', 'v18.1 : entree appareil photo');
-  has(html, 'id="photoGal"', 'v18.1 : entree galerie/fichiers SANS capture (Android laisse le choix)');
+  has(html, 'id="photoGal"', 'v18.1/v18.7 : unique entree = import galerie/fichiers SANS capture');
   has(html, 'position:absolute;left:0;top:0;width:100%;height:100%;opacity:0', 'v18.5 : overlay input sur TOUTE la surface du bouton (Section 18)');
   has(html, 'pShootGal', 'v18.1 : bouton galerie/fichiers distinct');
   has(html, 'cdn.jsdelivr.net/npm/tesseract.js@5', 'v18 source : Tesseract.js charge a la demande');
@@ -589,8 +588,7 @@ async function main() {
   ok(els['pOkBtn'].textContent.indexOf('1 élément') >= 0, 'v18 : le bouton ne compte que les lignes gardees');
   openPhotoModal();
   eq(els['pNameWrap'].className, '', 'v18 : nouvelle liste → champ nom visible');
-  eq(els['pShootCam'].className, 'bigphoto', 'v18.1 : bouton appareil photo visible a l ouverture');
-  eq(els['pShootGal'].className, 'bigphoto alt', 'v18.1 : bouton galerie/fichiers visible a l ouverture');
+  eq(els['pShootGal'].className, 'bigphoto', 'v18.7 : bouton unique import galerie visible a l ouverture');
   openPhotoModal(lP18.id);
   eq(els['pNameWrap'].className, 'hidden', 'v18 : liste cible → champ nom masque');
   ok(els['pLabel'].textContent.indexOf('Liste photo') >= 0, 'v18 : le titre vise la liste cible');
