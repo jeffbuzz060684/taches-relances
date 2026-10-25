@@ -121,6 +121,30 @@
   .item .masked { color: #b3c0d1; letter-spacing: 2px; }
   .item.secret { border-left: 3px dashed #fbbf24; }
   .listcard .tpl { font-size: 10px; color: #fbbf24; border: 1px solid #fbbf24; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+  /* v18 : 📷 Photo → liste (lecture du texte dans l'appareil) */
+  .photoact { padding: 0 0 10px; }
+  .photoact button {
+    border: 1px dashed #a78bfa; background: rgba(167,139,250,0.08); color: #a78bfa;
+    font-weight: 700; border-radius: 10px; padding: 9px 12px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .bigphoto {
+    display: block; width: 100%; margin: 12px 0 4px;
+    background: #a78bfa; color: #020617; font-weight: 700; font-size: 15px;
+    border: none; border-radius: 12px; padding: 13px; cursor: pointer; font-family: inherit;
+  }
+  .photoline {
+    display: flex; align-items: center; gap: 10px;
+    background: #020617; border: 1px solid #1e293b; border-radius: 10px;
+    padding: 9px 10px; margin-bottom: 6px; cursor: pointer;
+  }
+  .photoline.off { opacity: 0.45; }
+  .photoline.off .txt { text-decoration: line-through; }
+  .photoline .txt { flex: 1; font-size: 14px; word-wrap: break-word; }
+  .photoline .chk { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 26px; height: 26px; font-size: 13px; }
+  .photoline .chk.on { background: #34d399; border-color: #34d399; color: #020617; }
+  #photoProg { height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; margin: 6px 0 10px; }
+  #photoProg > div { height: 100%; background: #38bdf8; width: 2%; transition: width 0.2s; }
+  html.light .photoline { background: #ffffff; border-color: #dbe2ea; }
   .searchrow { display: flex; gap: 8px; padding: 0 12px 8px; max-width: 560px; margin: 0 auto; }
   .searchrow input {
     flex: 1; background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
@@ -468,6 +492,32 @@
     </div>
   </div>
 </div>
+<div id="photoModal" class="modal hidden">
+  <div class="sheet">
+    <div class="st" id="pLabel">📷 Photo → nouvelle liste</div>
+    <div class="flabel" id="pHint">Photographie un document écrit (liste papier, inventaire, note…) — l'app lit le texte et crée la liste toute seule : une ligne = un élément.</div>
+    <input type="file" id="photoFile" accept="image/*" capture="environment" class="hidden" onchange="photoPicked(event)">
+    <button class="bigphoto" id="pShoot" onclick="document.getElementById('photoFile').click()">📸 Prendre / choisir une photo</button>
+    <div id="pProgWrap" class="hidden">
+      <div class="flabel" id="pProgTxt">Lecture du document…</div>
+      <div id="photoProg"><div></div></div>
+    </div>
+    <div id="pResults" class="hidden">
+      <div id="pNameWrap">
+        <input type="text" id="pName" placeholder="Nom de la liste">
+      </div>
+      <div class="flabel">Lignes détectées — touche une ligne pour l'écarter :</div>
+      <div id="pLines"></div>
+      <div class="row">
+        <button class="cancel" onclick="closePhotoModal()">Annuler</button>
+        <button class="ok" id="pOkBtn" onclick="photoCreate()">✅ Créer la liste</button>
+      </div>
+    </div>
+    <div class="row" id="pCancelRow">
+      <button class="cancel" onclick="closePhotoModal()">Fermer</button>
+    </div>
+  </div>
+</div>
 <div id="evModal" class="modal hidden">
   <div class="sheet">
     <div class="st" id="eLabel">Modifier l'événement</div>
@@ -558,7 +608,7 @@
 "use strict";
 
 // ===== Tâches & Relances — v17 (demande Jade : « 1, 2, 3 sans oublier toutes les synchros et modifications dans les 2 sens ») : relances Google Calendar pilotées depuis l'app (poussées ET tirées, PATCH couleur+relances SEULES pour les importées), PATCH au lieu de PUT (lieu/invités/description/relances réglés dans Google ne sont plus écrasés au push des liées), DELETE 404/410 = succès, timeout 20 s sur TOUS les fetch agenda, synchro auto 2 min + toast ⚡ quand elle change quelque chose, la note suit la description Google dans les 2 sens =====
-var APP_VERSION = "v17";
+var APP_VERSION = "v18";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -2881,17 +2931,18 @@ function listCardHtml(l, isSub) {
     + "</div></div>";
 }
 function listsOverviewHtml() {
-  var html = "";
+  var pb18 = '<div class="photoact"><button onclick="openPhotoModal()">📷 Photo → nouvelle liste</button></div>'; // v18 : créer une liste depuis une photo
+  var html = pb18;
   var lists = state.lists;
   if (searchQ) {
     lists = state.lists.filter(function (l) {
       if (String(l.name).toLowerCase().indexOf(searchQ) >= 0) return true;
       return (l.items || []).some(function (it) { return String(it.text).toLowerCase().indexOf(searchQ) >= 0; });
     });
-    if (lists.length === 0) return '<div class="empty">🔎 Aucune liste ne correspond à « ' + esc(searchQ) + ' ».</div>';
+    if (lists.length === 0) return pb18 + '<div class="empty">🔎 Aucune liste ne correspond à « ' + esc(searchQ) + ' ».</div>';
     html += '<div class="empty">🔎 ' + lists.length + " liste(s) trouvée(s)</div>";
   } else if (state.lists.length === 0) {
-    return '<div class="empty">Aucune liste — appuie sur ＋ (ex : « Matériel manœuvre »).</div>';
+    return pb18 + '<div class="empty">Aucune liste — appuie sur ＋ ou 📷 (ex : « Matériel manœuvre »).</div>';
   }
   var idsIn = {};
   lists.forEach(function (l) { idsIn[l.id] = true; });
@@ -2972,6 +3023,7 @@ function renderListDetail() {
     + '<button onclick="duplicateList(\'' + l.id + "');renderAll()\">📋 Dupliquer</button>"
     + '<button onclick="toggleTemplate(\'' + l.id + "')\">" + (l.template === true ? "📌 Modèle : ✅ ON" : "📌 Garder comme modèle") + "</button>"
     + '<button onclick="openListModal(null,\'' + l.id + "')\">➕ Sous-liste</button>"
+    + '<button onclick="openPhotoModal(\'' + l.id + "')\">📷 Photo → ajouter</button>"
     + '<button' + (armed["L:" + l.id] ? ' class="armed"' : "") + ' onclick="onDeleteList(\'' + l.id + "')\">" + (armed["L:" + l.id] ? "Confirmer ?" : "🗑️ Supprimer") + "</button>"
     + "</div>";
   el.innerHTML = html;
@@ -3499,6 +3551,134 @@ function saveListModal() {
   renderAll();
 }
 
+// ---------- v18 : 📷 Photo → liste (lecture du texte sur l'appareil, via Tesseract.js, aucun serveur) ----------
+var photoTargetList = null; // null = créer une nouvelle liste ; sinon = id de la liste à remplir
+var photoLines = []; // [{ text: "...", keep: true|false }]
+var tesseractP = null; // chargeur mémoïsé (téléchargé une seule fois)
+
+function openPhotoModal(listId) {
+  photoTargetList = (listId && getList(listId)) ? listId : null;
+  var l = photoTargetList ? getList(photoTargetList) : null;
+  document.getElementById("pLabel").textContent = l ? "📷 Photo → « " + l.name + " »" : "📷 Photo → nouvelle liste";
+  document.getElementById("pHint").textContent = l
+    ? "Photographie un document écrit — chaque ligne lue sera ajoutée à « " + l.name + " »."
+    : "Photographie un document écrit (liste papier, inventaire, note…) — l'app lit le texte et crée la liste toute seule : une ligne = un élément.";
+  document.getElementById("pNameWrap").className = l ? "hidden" : "";
+  document.getElementById("pResults").className = "hidden";
+  document.getElementById("pProgWrap").className = "hidden";
+  document.getElementById("pShoot").className = "bigphoto";
+  document.getElementById("pCancelRow").className = "row";
+  var pf = document.getElementById("photoFile");
+  if (pf) pf.value = "";
+  document.getElementById("photoModal").className = "modal";
+}
+function closePhotoModal() {
+  document.getElementById("photoModal").className = "modal hidden";
+}
+function photoProgress(pct, txt) {
+  var bar = document.querySelector("#photoProg > div");
+  if (bar) bar.style.width = Math.max(2, Math.min(100, pct)) + "%";
+  var t = document.getElementById("pProgTxt");
+  if (t && txt) t.textContent = txt;
+}
+function loadTesseract() {
+  if (tesseractP) return tesseractP;
+  tesseractP = new Promise(function (resolve, reject) {
+    if (typeof Tesseract !== "undefined" && Tesseract.recognize) { resolve(Tesseract); return; }
+    var s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    s.onload = function () {
+      if (typeof Tesseract !== "undefined" && Tesseract.recognize) resolve(Tesseract);
+      else { tesseractP = null; reject(new Error("Tesseract introuvable")); }
+    };
+    s.onerror = function () { tesseractP = null; reject(new Error("Chargement impossible")); };
+    document.head.appendChild(s);
+  });
+  return tesseractP;
+}
+// une ligne lue = un élément ; on écarte le bruit et les doublons
+function ocrLines(text) {
+  var seen = {}, out = [];
+  String(text || "").split(/\r?\n/).forEach(function (raw) {
+    var s = raw.replace(/\s+/g, " ").trim();
+    if (s.length < 2) return;
+    if (!/[a-zà-ö0-9]/i.test(s)) return;
+    if (seen[s]) return;
+    seen[s] = true;
+    if (out.length < 200) out.push(s);
+  });
+  return out;
+}
+function photoPicked(ev) {
+  var f = ev && ev.target && ev.target.files && ev.target.files[0];
+  if (ev && ev.target) ev.target.value = "";
+  if (!f) return;
+  document.getElementById("pShoot").className = "bigphoto hidden";
+  document.getElementById("pCancelRow").className = "row hidden";
+  document.getElementById("pResults").className = "hidden";
+  document.getElementById("pProgWrap").className = "";
+  photoProgress(3, "Chargement du lecteur… (la première fois seulement)");
+  loadTesseract().then(function (T) {
+    photoProgress(8, "Lecture du document…");
+    return T.recognize(f, "fra", { logger: function (m) {
+      if (m && typeof m.progress === "number") photoProgress(10 + Math.round(m.progress * 85), "Lecture du document… " + Math.round(m.progress * 100) + " %");
+    } });
+  }).then(function (res) {
+    photoLines = ocrLines(res && res.data && res.data.text).map(function (t) { return { text: t, keep: true }; });
+    if (!photoLines.length) {
+      showToast("⚠️ Aucun texte lu — reprends la photo bien à plat, nette et éclairée");
+      openPhotoModal(photoTargetList);
+      return;
+    }
+    document.getElementById("pProgWrap").className = "hidden";
+    document.getElementById("pResults").className = "";
+    var nm = document.getElementById("pName");
+    if (nm && !nm.value) nm.value = "Photo " + fmtDate(today()).slice(0, 5);
+    renderPhotoLines();
+  }).catch(function () {
+    showToast("⚠️ Lecture impossible — vérifie la connexion Internet (nécessaire la première fois)");
+    openPhotoModal(photoTargetList);
+  });
+}
+function renderPhotoLines() {
+  var html = "";
+  photoLines.forEach(function (ln, i) {
+    html += '<div class="photoline' + (ln.keep ? "" : " off") + '" onclick="photoToggle(' + i + ')">'
+      + '<span class="chk' + (ln.keep ? " on" : "") + '">' + (ln.keep ? "✓" : "") + "</span>"
+      + '<span class="txt">' + esc(ln.text) + "</span></div>";
+  });
+  document.getElementById("pLines").innerHTML = html;
+  var n = photoLines.filter(function (x) { return x.keep; }).length;
+  var l = photoTargetList ? getList(photoTargetList) : null;
+  document.getElementById("pOkBtn").textContent = l
+    ? "✅ Ajouter " + n + " élément(s) à « " + l.name + " »"
+    : "✅ Créer la liste (" + n + " élément(s))";
+}
+function photoToggle(i) {
+  if (!photoLines[i]) return;
+  photoLines[i].keep = !photoLines[i].keep;
+  renderPhotoLines();
+}
+function photoCreate() {
+  var keep = photoLines.filter(function (x) { return x.keep; }).map(function (x) { return x.text; });
+  if (!keep.length) { showToast("⚠️ Garde au moins une ligne"); return; }
+  var tgt = (photoTargetList && getList(photoTargetList)) ? getList(photoTargetList) : null;
+  if (tgt) {
+    keep.forEach(function (t) { addItem(photoTargetList, t, false); });
+    closePhotoModal();
+    renderAll();
+    showToast("➕ " + keep.length + " élément(s) ajoutés à « " + tgt.name + " »");
+  } else {
+    var name = (document.getElementById("pName").value || "").trim() || ("Photo " + fmtDate(today()).slice(0, 5));
+    var nl = addList(name);
+    keep.forEach(function (t) { addItem(nl.id, t, false); });
+    closePhotoModal();
+    currentListId = nl.id;
+    showView("list");
+    showToast("📋 Liste « " + name + " » créée — " + keep.length + " élément(s) 🎉");
+  }
+}
+
 // ---------- Toast (avec bouton « Annuler » quand une action est proposée) ----------
 var toastTimer = null;
 function showToast(msg, opts) {
@@ -3534,6 +3714,7 @@ function closeAllSheets() {
   try { closeQuickAdd(); } catch (e2) {}
   try { closeDeferSheet(); } catch (e2) {}
   try { closeItemModal(); } catch (e2) {}
+  try { closePhotoModal(); } catch (e2) {}
 }
 // Retour au premier plan de l'app (PWA) : on resynchronise
 if (typeof document !== "undefined" && document.addEventListener) {
@@ -3587,3 +3768,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+
