@@ -105,10 +105,12 @@ function cleanState163() { // isolation entre sections
 
 async function main() {
   // ===== Section 0 : versions et sources =====
-  eq(APP_VERSION, 'v18.5', 'APP_VERSION v18.5');
+  eq(APP_VERSION, 'v18.6', 'APP_VERSION v18.6');
   ok(exportData().version === 17, 'exportData version 17 (format Drive inchangé en v18)');
-  has(html, 'var APP_VERSION = "v18.5"', 'source : APP_VERSION v18.5');
-  has(swSrc, "const CACHE = 'taches-relances-v18.5'", 'sw : cache renomme v18.5 (exact)');
+  has(html, 'var APP_VERSION = "v18.6"', 'source : APP_VERSION v18.6');
+  has(swSrc, "const CACHE = 'taches-relances-v18.6'", 'sw : cache renomme v18.6 (exact)');
+  has(html, 'r.update()', 'v18.6 : mise a jour ACTIVE — l app demande les nouveautes (retour premier plan + toutes les 2 min)');
+  has(html, 'visibilitychange', 'v18.6 : update au retour au premier plan');
   has(html, 'location.reload()', 'v18.3 : nouvelle version → rechargement automatique (fini le rechargement manuel)');
   has(html, 'opacity:0;cursor:pointer', 'v18.5 : entree fichier invisible POSEE sur le bouton (tap direct sur l input — fiable sur Opera et tous navigateurs)');
   ok(html.indexOf('left:-9999px') < 0, 'v18.5 : plus d entree hors ecran (Opera n active pas un input hors de la vue)');

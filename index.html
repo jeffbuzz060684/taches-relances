@@ -609,7 +609,7 @@
 "use strict";
 
 // ===== Tâches & Relances — v17 (demande Jade : « 1, 2, 3 sans oublier toutes les synchros et modifications dans les 2 sens ») : relances Google Calendar pilotées depuis l'app (poussées ET tirées, PATCH couleur+relances SEULES pour les importées), PATCH au lieu de PUT (lieu/invités/description/relances réglés dans Google ne sont plus écrasés au push des liées), DELETE 404/410 = succès, timeout 20 s sur TOUS les fetch agenda, synchro auto 2 min + toast ⚡ quand elle change quelque chose, la note suit la description Google dans les 2 sens =====
-var APP_VERSION = "v18.5";
+var APP_VERSION = "v18.6";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -3770,6 +3770,21 @@ if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
     navigator.serviceWorker.register('sw.js').catch(function () {});
   });
+  // v18.6 : mise a jour ACTIVE — l'app DEMANDE les nouveautes au lieu d'attendre un rechargement complet.
+  // 1) des que l'app revient au premier plan (retour depuis l'accueil, changement d'app…)
+  if (typeof document !== "undefined" && document.addEventListener) {
+    document.addEventListener("visibilitychange", function () {
+      try {
+        if (typeof document.hidden !== "undefined" && !document.hidden) {
+          navigator.serviceWorker.getRegistration().then(function (r) { if (r) r.update(); }).catch(function () {});
+        }
+      } catch (e) {}
+    });
+  }
+  // 2) toutes les 2 minutes tant que l'app est ouverte
+  setInterval(function () {
+    try { navigator.serviceWorker.getRegistration().then(function (r) { if (r) r.update(); }).catch(function () {}); } catch (e) {}
+  }, 120000);
   navigator.serviceWorker.addEventListener('controllerchange', function () {
     if (_hadSW) { // v18.3 : nouvelle version deja installee en arriere-plan → recharge tout seul (l'ancien code demandait un rechargement manuel, jamais fait)
       try { showToast("🔄 Nouvelle version installée — rechargement…"); } catch (e) {}
