@@ -105,10 +105,11 @@ function cleanState163() { // isolation entre sections
 
 async function main() {
   // ===== Section 0 : versions et sources =====
-  eq(APP_VERSION, 'v18.2', 'APP_VERSION v18.2');
+  eq(APP_VERSION, 'v18.3', 'APP_VERSION v18.3');
   ok(exportData().version === 17, 'exportData version 17 (format Drive inchangé en v18)');
-  has(html, 'var APP_VERSION = "v18.2"', 'source : APP_VERSION v18.2');
-  has(swSrc, "const CACHE = 'taches-relances-v18.2'", 'sw : cache renomme v18.2 (exact)');
+  has(html, 'var APP_VERSION = "v18.3"', 'source : APP_VERSION v18.3');
+  has(swSrc, "const CACHE = 'taches-relances-v18.3'", 'sw : cache renomme v18.3 (exact)');
+  has(html, 'location.reload()', 'v18.3 : nouvelle version → rechargement automatique (fini le rechargement manuel)');
   ok(swSrc.indexOf('taches-relances-v17') < 0, 'sw : plus de reference v17');
   ok(swSrc.indexOf('taches-relances-v16.4') < 0, 'sw : plus de reference v16.4');
   has(html, 'id="eTypes"', 'source : rangee type dans la modale evenement');
