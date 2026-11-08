@@ -1,5 +1,14 @@
 # CHANGELOG — Tâches & Relances
 
+## v19.1 (2026-11-08) — « Listes »
+- **⭐ Épinglage + ⇅ ordre manuel des listes** : une liste importante se colle en haut de l'onglet d'un tap (⭐/📌), et le mode ⇅ réordonne les listes racines à la main. `pinned` et `order` sont suivis par `normalizeListIn` → la fusion Drive multi-appareils les conserve ; les deux listes touchées bumpent leur `updatedAt`.
+- **🔗 Date de l'événement lié sur la carte** : une liste liée à un événement agenda affiche sa date (jj/mm/aaaa) directement dans l'onglet, plus besoin de l'ouvrir.
+- **Filtres Tout / ⏳ En cours / 📋 Modèles / ✅ Finies** avec compteurs : une liste est « finie » quand 100 % de ses éléments sont cochés, sous-listes incluses (agrégat récursif).
+- **🧮 Récap des quantités restantes** dans le détail d'une liste : « Reste N élément(s) · quantité totale Q » (somme des quantités non cochées).
+- **🧮 Vue « Ce qui manque »** : toutes les listes confondues, seuls les éléments NON cochés, groupés par famille (racine + sous-listes), cochables en un tap, et **imprimables** (feuille de courses prête à partir) — les codes 🔐 y sont toujours masqués ••••••, jamais en clair ni à l'impression.
+- **➡️ Déplacer un élément vers une autre liste** : dans la modale élément, un sélecteur propose toutes les autres listes ; texte, quantité et code 🔐 sont préservés, `updatedAt` bumpé sur les DEUX listes pour la fusion Drive.
+- Harnais **325 tests, 0 échec** (255 v19 + 70 v19.1). Format de données inchangé (`version 19 ≥ 16`, pas de rotation Drive).
+
 ## v19 (2026-11-08) — « Haut de gamme »
 - **🗓️ Vue Calendrier intégrée** : grille du mois (tâches + événements agenda superposés, pastilles 🔴 pro / 🔵 perso / 🟢 événement), navigation ◀ ▶ + retour Aujourd'hui, bandeau des retards. Taper un jour ouvre la feuille du jour : tâches (✓ faite, ⬅️ reporter, ✏️ modifier), événements (＋ tâche, ✏️ modifier dans Google), et « ➕ Tâche ce jour » qui pré-remplit la saisie rapide avec la date choisie. Les tâches et événements multi-jours apparaissent sur toute leur plage.
 - **📊 Statistiques** : 6 compteurs (faites cette semaine avec tendance ▲▼ vs la semaine dernière, ce mois-ci, en cours, en retard, total, éléments de listes) + graphique SVG des 10 dernières semaines, zéro dépendance externe.

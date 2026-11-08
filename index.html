@@ -431,6 +431,8 @@ html.light .blabel { fill:#64748b; } html.light .bval { fill:#334155; }
 #printArea .pdoc ul { margin:0; padding:0; }
 #printArea .pdoc li { list-style:none; padding:5px 0; border-bottom:1px solid #ddd; font-size:13px; }
 #printArea .pdoc .pempty { font-size:12px; color:#777; }
+/* v19.1 : barre de filtres de l'onglet 🧺 Listes (réutilise les .chips .chip existants) */
+.lfilters { display:flex; flex-wrap:wrap; gap:6px; padding:2px 12px 8px; max-width:560px; margin:0 auto; }
 @media print {
   body.printing > *:not(#printArea) { display:none !important; }
   #printArea { display:block !important; }
@@ -652,6 +654,8 @@ html.light .blabel { fill:#64748b; } html.light .bval { fill:#334155; }
     <div class="time-row">
       <input type="number" id="iQty" min="1" max="999" placeholder="Quantité (optionnel)">
     </div>
+    <div class="flabel">➡️ Déplacer vers une autre liste (optionnel)</div>
+    <select id="iMove"></select>
     <label class="qag"><input type="checkbox" id="iSecret"> Code masqué 🔐</label>
     <div class="row">
       <button class="cancel" onclick="closeItemModal()">Annuler</button>
@@ -675,8 +679,8 @@ html.light .blabel { fill:#64748b; } html.light .bval { fill:#334155; }
 "use strict";
 
 // ===== Tâches & Relances — v17 (demande Jade : « 1, 2, 3 sans oublier toutes les synchros et modifications dans les 2 sens ») : relances Google Calendar pilotées depuis l'app (poussées ET tirées, PATCH couleur+relances SEULES pour les importées), PATCH au lieu de PUT (lieu/invités/description/relances réglés dans Google ne sont plus écrasés au push des liées), DELETE 404/410 = succès, timeout 20 s sur TOUS les fetch agenda, synchro auto 2 min + toast ⚡ quand elle change quelque chose, la note suit la description Google dans les 2 sens =====
-// ===== Tâches & Relances — v19 « Haut de gamme » : vue Calendrier 🗓️ (grille du mois, tâches + événements, feuille du jour, tâche créée sur la date choisie), Statistiques 📊 (10 dernières semaines en graphique, compteurs), Impression 🖨️ d'une liste (PDF — les codes 🔐 ne sont JAMAIS imprimés), recherche étendue aux listes + éléments + événements, timeout 20 s sur le DELETE Drive (le dernier fetch réseau sans garde-fou). Base v18 : relances Google 2 sens, PATCH, photo → liste (OCR). =====
-var APP_VERSION = "v19";
+// ===== Tâches & Relances — v19.1 « Listes » : ⭐ épingler + ⇅ réordonner les listes (l'ordre et l'épingle voyagent sur Drive), 🔗 date de l'événement lié visible sur la carte, filtres Tout/En cours/Modèles/Finies, 🧮 récap des quantités restantes (détail + vue « Ce qui manque » consolidée toutes listes, imprimable), ➡️ déplacer un élément vers une autre liste. Base v19 : calendrier, stats, impression, recherche étendue, timeout Drive. =====
+var APP_VERSION = "v19.1";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -972,6 +976,9 @@ var armed = {};            // suppressions à confirmer (id -> timestamp)
 var searchQ = "";         // recherche live (tâches + listes), non persistée
 var revealed = {};         // codes révélés (transitoire, jamais persisté)
 var secretNext = false;    // mode « prochain élément = code masqué »
+var listFilter = "all";    // v19.1 : filtre onglet Listes (all|active|templates|done)
+var listReorderMode = false; // v19.1 : mode ⇅ réordonner les listes racines
+var manqueMode = false;    // v19.1 : vue consolidée « 🧮 Ce qui manque » (toutes listes)
 
 // ---------- Recherche live ----------
 function setSearch(v) {
@@ -1460,6 +1467,154 @@ function listProgressAgg(l) {
   });
   return agg;
 }
+// ---------- v19.1 : Listes pro — épinglage ⭐, ordre manuel ⇅, filtres, récap 🧮, vue manquant ----------
+// une liste est « finie » quand 100 % de ses éléments sont cochés (avec ses sous-listes le cas échéant)
+function listIsDone(l) {
+  var subs = state.lists.filter(function (c) { return c.parent === l.id; });
+  var p = subs.length > 0 ? listProgressAgg(l) : listProgress(l);
+  return p.total > 0 && p.done >= p.total;
+}
+// listes racines : épinglées ⭐ d'abord, puis ordre manuel ⇅, puis date de création
+function listRoots() {
+  var idsIn = {};
+  state.lists.forEach(function (l) { idsIn[l.id] = true; });
+  return state.lists.filter(function (l) { return !l.parent || !idsIn[l.parent]; }).sort(function (a, b) {
+    var pa = a.pinned === true ? 0 : 1, pb = b.pinned === true ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    var oa = a.order != null ? a.order : Infinity;
+    var ob = b.order != null ? b.order : Infinity;
+    if (oa !== ob) return oa - ob;
+    return String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
+  });
+}
+// racines visibles selon le filtre actif (Tout / En cours / Modèles / Finies)
+function listVisibleRoots() {
+  var roots = listRoots();
+  if (listFilter === "active") return roots.filter(function (l) { return l.template !== true && !listIsDone(l); });
+  if (listFilter === "templates") return roots.filter(function (l) { return l.template === true; });
+  if (listFilter === "done") return roots.filter(function (l) { return l.template !== true && listIsDone(l); });
+  return roots;
+}
+function setListFilter(k) { listFilter = k; renderAll(); }
+function toggleListReorder() { listReorderMode = !listReorderMode; renderAll(); }
+// ⭐ épingler une liste : elle remonte en haut (l'ordre manuel est conservé entre listes épinglées)
+function togglePinList(id) {
+  var l = getList(id);
+  if (!l) return false;
+  l.pinned = !(l.pinned === true);
+  l.updatedAt = Date.now();
+  save();
+  renderAll();
+  showToast(l.pinned ? "📌 Liste épinglée en haut" : "⭐ Liste désépinglée");
+  return true;
+}
+// ⇅ déplacer une liste racine d'un cran dans la séquence affichée (ordres normalisés 0..n-1 puis échangés)
+function moveRootList(id, dir) {
+  var seq = listVisibleRoots().map(function (l) { return l.id; });
+  var i = seq.indexOf(id);
+  var j = i + (dir === -1 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= seq.length) return false;
+  var a = getList(seq[i]), b = getList(seq[j]);
+  listRoots().forEach(function (l, k) { l.order = k; }); // normalise l'ordre manuel de toutes les racines
+  var tmp = a.order; a.order = b.order; b.order = tmp;
+  a.updatedAt = Date.now(); b.updatedAt = Date.now();
+  save();
+  renderAll();
+  return true;
+}
+// 🧮 vue « Ce qui manque » : tous les éléments non cochés, toutes listes confondues
+function openManque() { manqueMode = true; renderAll(); }
+function closeManque() { manqueMode = false; renderAll(); }
+function manqueQty() {
+  var items = 0, qty = 0;
+  state.lists.forEach(function (l) { (l.items || []).forEach(function (it) {
+    if (!it.done) { items++; qty += (typeof it.qty === "number" && it.qty > 0) ? it.qty : 1; }
+  }); });
+  return { items: items, qty: qty };
+}
+function manqueCount() { return manqueQty().items; }
+// famille complète d'une racine : elle-même + toutes ses sous-listes (récursif)
+function listFamily(root) {
+  var out = [];
+  (function walk(l) {
+    out.push(l);
+    state.lists.filter(function (c) { return c.parent === l.id; }).forEach(walk);
+  })(root);
+  return out;
+}
+function renderManqueHtml() {
+  var mq = manqueQty();
+  var html = '<div class="calnav">'
+    + '<button class="rowbtn" onclick="closeManque()">← Listes</button>'
+    + '<h3>🧮 Ce qui manque</h3>'
+    + '<button class="rowbtn" title="Imprimer la feuille" onclick="printManque()">🖨️</button>'
+    + "</div>"
+    + '<div class="empty">🧮 ' + mq.items + " élément(s) non coché(s) · quantité totale " + mq.qty + " — toutes listes confondues, tape pour cocher</div>";
+  var any = false;
+  listRoots().forEach(function (root) {
+    var rows = "";
+    listFamily(root).forEach(function (l) {
+      (l.items || []).forEach(function (it) {
+        if (it.done) return;
+        var txtHtml = it.qty ? '<span class="qty">' + it.qty + " × </span>" : "";
+        if (it.secret) txtHtml += '<span class="masked">••••••</span>'; // v19.1 : jamais le texte du code 🔐
+        else txtHtml += esc(it.text);
+        rows += '<div class="item' + (it.secret ? " secret" : "") + '">'
+          + '<button class="chk" onclick="toggleItem(\'' + l.id + "','" + it.id + '\');renderAll()"></button>'
+          + '<div class="txt">' + txtHtml + "</div>"
+          + "</div>";
+      });
+    });
+    if (rows) {
+      any = true;
+      html += '<div class="flabel" style="margin-top:12px">' + esc(root.name) + "</div>" + rows;
+    }
+  });
+  if (!any) html += '<div class="empty">✅ Tout est coché — rien ne manque !</div>';
+  return html;
+}
+function printManqueHtml() {
+  var mq = manqueQty();
+  var h = "<h1>🧮 Ce qui manque</h1>"
+    + '<div class="pmeta">Imprimé le ' + fmtDate(today()) + " · " + mq.items + " élément(s) · quantité totale " + mq.qty + "</div>";
+  var any = false;
+  listRoots().forEach(function (root) {
+    var lis = "";
+    listFamily(root).forEach(function (l) {
+      (l.items || []).forEach(function (it) {
+        if (it.done) return;
+        var txt = (it.qty ? it.qty + " × " : "") + (it.secret ? "•••••• (code masqué — jamais imprimé)" : esc(it.text)); // 🔐 jamais imprimé
+        lis += "<li>☐ " + txt + "</li>";
+      });
+    });
+    if (lis) { any = true; h += "<h2>" + esc(root.name) + "</h2><ul>" + lis + "</ul>"; }
+  });
+  if (!any) h += '<p class="pempty">✅ Tout est coché — rien ne manque !</p>';
+  return '<div class="pdoc">' + h + "</div>";
+}
+function printManque() {
+  document.getElementById("printArea").innerHTML = printManqueHtml();
+  try { if (document.body && document.body.classList) document.body.classList.add("printing"); } catch (e) {}
+  try { if (typeof window !== "undefined" && window.print) window.print(); } catch (e) {}
+  setTimeout(function () { // le dialogue d'impression est bloquant sur mobile — on nettoie juste après
+    try { if (document.body && document.body.classList) document.body.classList.remove("printing"); } catch (e) {}
+    document.getElementById("printArea").innerHTML = "";
+  }, 1500);
+}
+// ➡️ déplacer un élément vers une autre liste (texte, quantité et code 🔐 préservés)
+function moveItemToList(fromListId, itemId, toListId, silent) {
+  var from = getList(fromListId), to = getList(toListId);
+  if (!from || !to || from.id === to.id) return false;
+  var idx = -1;
+  from.items.forEach(function (it, i) { if (it.id === itemId) idx = i; });
+  if (idx < 0) return false;
+  var it = from.items.splice(idx, 1)[0];
+  to.items.push(it);
+  var now = Date.now();
+  from.updatedAt = now; to.updatedAt = now;
+  if (silent !== true) { save(); renderAll(); showToast("➡️ Déplacé vers « " + to.name + " »"); }
+  return true;
+}
 // 🙈 masquer les éléments déjà cochés (état mémorisé par liste)
 function toggleHideDone(listId) {
   var l = getList(listId);
@@ -1481,6 +1636,16 @@ function openItemModal(listId, itemId) {
   document.getElementById("iText").value = it.text;
   document.getElementById("iQty").value = it.qty || "";
   document.getElementById("iSecret").checked = it.secret === true;
+  // v19.1 : sélecteur ➡️ « déplacer vers » — toutes les listes sauf celle de l'élément
+  var mv = document.getElementById("iMove");
+  var opts = '<option value="">— Ne pas déplacer —</option>';
+  state.lists.forEach(function (o) {
+    if (o.id === listId) return;
+    var isSub = state.lists.some(function (p) { return p.id === o.parent; });
+    opts += '<option value="' + esc(o.id) + '">' + (isSub ? "📁 " : "") + esc(o.name) + "</option>";
+  });
+  mv.innerHTML = opts;
+  mv.value = "";
   document.getElementById("itemModal").className = "modal";
 }
 function closeItemModal() {
@@ -1499,10 +1664,17 @@ function saveItemModal() {
   it.text = v;
   it.qty = (!secret && !isNaN(q) && q > 0 && q < 1000) ? q : null; // un code masqué n'a jamais de quantité
   it.secret = secret;
+  // v19.1 : ➡️ déplacement optionnel vers une autre liste (après l'édition, une seule sauvegarde)
+  var moveTarget = document.getElementById("iMove").value || "";
+  var moved = false;
+  if (moveTarget && moveTarget !== editItemIds.listId && getList(moveTarget)) {
+    moved = moveItemToList(editItemIds.listId, editItemIds.itemId, moveTarget, true); // silent : save() géré ici
+  }
   save();
   closeItemModal();
   renderAll();
-  showToast("✅ Élément modifié");
+  if (moved) showToast("➡️ Élément modifié et déplacé");
+  else showToast("✅ Élément modifié");
 }
 function onDeleteList(id) {
   var key = "L:" + id;
@@ -1582,6 +1754,8 @@ function normalizeListIn(l) {
     parent: (typeof l.parent === "string" && /^[\w-]{1,64}$/.test(l.parent)) ? l.parent : null,
     template: l.template === true,
     hideDone: l.hideDone === true,
+    pinned: l.pinned === true, // v19.1 : liste épinglée en haut de l'onglet (suivie par la fusion Drive)
+    order: (typeof l.order === "number" && isFinite(l.order)) ? l.order : null, // v19.1 : position dans l'onglet (suivie par la fusion Drive)
     evId: (typeof l.evId === "string" && l.evId) ? l.evId : null, // v14 : liste liée à un événement agenda (suivie par la fusion Drive)
     updatedAt: (typeof l.updatedAt === "number" && l.updatedAt > 0) ? l.updatedAt : null,
     items: (Array.isArray(l.items) ? l.items : []).filter(function (it) { return it && typeof it.text === "string"; }).map(function (it) {
@@ -3010,9 +3184,17 @@ function listCardHtml(l, isSub) {
   var pct = pr.total > 0 ? Math.round(100 * pr.done / pr.total) : 0;
   var subNote = (!isSub && kids.length > 0) ? '<div class="subn">📁 ' + kids.length + " sous-liste(s) · total " + pr.done + "/" + pr.total + "</div>" : "";
   var tplBadge = (l.template === true) ? '<span class="tpl">📋 modèle</span>' : "";
+  var evL191 = (l.evId && findEvent(l.evId)) ? '<span class="tpl">🔗 ' + fmtDate(findEvent(l.evId).day) + "</span>" : ""; // v19.1 : la date de l'événement lié visible DIRECTEMENT sur la carte
+  var pin191 = (!isSub) // v19.1 : épingler les listes importantes en haut — un seul tap
+    ? '<button title="' + (l.pinned === true ? "Désépingler" : "Épingler en haut de l'onglet") + '" onclick="togglePinList(\'' + l.id + "')\">" + (l.pinned === true ? "📌" : "⭐") + "</button>"
+    : "";
+  var rd191 = (listReorderMode && !isSub) // v19.1 : les ▲▼ de réordonnancement ne vivent QUE dans le mode ⇅
+    ? '<button title="Monter" onclick="moveRootList(\'' + l.id + "',-1)\">▲</button>"
+      + '<button title="Descendre" onclick="moveRootList(\'' + l.id + "',1)\">▼</button>"
+    : "";
   var tplBtn = (l.template === true) ? '<button title="Créer une liste neuve depuis ce modèle (cochages à zéro)" onclick="newFromTemplate(\'' + l.id + "')\">➕ Nouvelle depuis</button>" : "";
   return '<div class="listcard' + (isSub ? " sub" : "") + '">'
-    + '<div class="name" onclick="openList(\'' + l.id + "')\">" + esc(l.name) + tplBadge + "</div>"
+    + '<div class="name" onclick="openList(\'' + l.id + "')\">" + esc(l.name) + tplBadge + evL191 + "</div>"
     + subNote
     + '<div class="row"><div class="bar"><div style="width:' + pct + '%"></div></div>'
     + '<span class="cnt">' + pr.done + "/" + pr.total + " ✓</span></div>"
@@ -3020,6 +3202,8 @@ function listCardHtml(l, isSub) {
     + tplBtn
     + '<button onclick="openList(\'' + l.id + "')\">Ouvrir</button>"
     + '<button title="Dupliquer (cochages remis à zéro)" onclick="duplicateList(\'' + l.id + "');renderAll()\">📋 Dupliquer</button>"
+    + pin191
+    + rd191
     + '<button' + (armed["L:" + l.id] ? ' class="armed"' : "") + ' onclick="onDeleteList(\'' + l.id + "')\">" + (armed["L:" + l.id] ? "Confirmer ?" : "🗑️") + "</button>"
     + "</div></div>";
 }
@@ -3036,10 +3220,25 @@ function listsOverviewHtml() {
     html += '<div class="empty">🔎 ' + lists.length + " liste(s) trouvée(s)</div>";
   } else if (state.lists.length === 0) {
     return pb18 + '<div class="empty">Aucune liste — appuie sur ＋ ou 📷 (ex : « Matériel manœuvre »).</div>';
+  } else if (manqueMode) {
+    return renderManqueHtml(); // v19.1 : vue consolidée « ce qui manque », toutes listes confondues
   }
-  var idsIn = {};
-  lists.forEach(function (l) { idsIn[l.id] = true; });
-  var roots = lists.filter(function (l) { return !l.parent || !idsIn[l.parent]; });
+  var roots = listRoots(); // v19.1 : épinglées d'abord, puis ordre manuel ⇅, puis date de création
+  var nAll = roots.length, nActive = 0, nTpl = 0, nDone = 0;
+  roots.forEach(function (l) {
+    if (l.template === true) nTpl++;
+    else if (listIsDone(l)) nDone++;
+    else nActive++;
+  });
+  roots = listVisibleRoots(); // v19.1 : filtre appliqué à la même séquence que ⇅ et que l'épinglage ⭐
+  html += '<div class="chips lfilters">' // v19.1 : filtres + réordonner + vue manque
+    + '<button class="chip' + (listFilter === "all" ? " on" : "") + '" onclick="setListFilter(\'all\')">Tout · ' + nAll + "</button>"
+    + '<button class="chip' + (listFilter === "active" ? " on" : "") + '" onclick="setListFilter(\'active\')">⏳ En cours · ' + nActive + "</button>"
+    + '<button class="chip' + (listFilter === "templates" ? " on" : "") + '" onclick="setListFilter(\'templates\')">📋 Modèles · ' + nTpl + "</button>"
+    + '<button class="chip' + (listFilter === "done" ? " on" : "") + '" onclick="setListFilter(\'done\')">✅ Finies · ' + nDone + "</button>"
+    + '<button class="chip' + (listReorderMode ? " on" : "") + '" onclick="toggleListReorder()">⇅ Réordonner</button>'
+    + '<button class="chip" onclick="openManque()">🧮 Ce qui manque · ' + manqueCount() + "</button>"
+    + "</div>";
   function tree(l, isSub) {
     var h = listCardHtml(l, isSub);
     state.lists.filter(function (c) { return c.parent === l.id; }).forEach(function (c) { h += tree(c, true); }); // récursif : tous les niveaux
@@ -3064,6 +3263,9 @@ function renderListDetail() {
     + '<button class="rowbtn" title="Renommer" onclick="openListModal(\'' + l.id + "')\">✏️</button>"
     + (l.evId && findEvent(l.evId) ? '<button class="rowbtn" title="Voir dans l\'agenda" onclick="showView(\'agenda\')">🔗 ' + fmtDate(findEvent(l.evId).day) + "</button>" : "") // v14 : liste liée à un événement — un tap saute à l'agenda
     + "</div>";
+  var reste = l.items.filter(function (it) { return !it.done; }); // v19.1 : récap des quantités restantes de cette liste
+  var resteQty = reste.reduce(function (s, it) { return s + ((typeof it.qty === "number" && it.qty > 0) ? it.qty : 1); }, 0);
+  if (resteQty > 0) html += '<div class="meta" style="padding:2px 14px 0">🧮 Reste ' + reste.length + " élément(s) · quantité totale " + resteQty + "</div>";
   var nSec15 = l.items.filter(function (it) { return it.secret; }).length; // v15 : rappel visible — les 🔐 restent sur cet appareil
   if (nSec15 > 0) html += '<div class="meta" style="padding:2px 14px 0">🔒 ' + nSec15 + " code(s) conservé(s) uniquement sur cet appareil — jamais envoyés sur Drive ni dans les exports</div>";
   var shown = (l.hideDone === true) ? l.items.filter(function (x) { return !x.done; }) : l.items;

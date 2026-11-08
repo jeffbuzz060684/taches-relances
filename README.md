@@ -12,6 +12,7 @@ PWA installable (ajout à l'écran d'accueil) de gestion de tâches et de relanc
 - **🖨️ Impression / PDF** d'une liste (cases, quantités, sous-listes) — les codes 🔐 ne sont jamais imprimés.
 - **Relances réelles** : chaque tâche peut piloter la notification Google Calendar (aucune / défaut agenda / 10 min à 2 jours avant) — la popup arrive par l'app Google Calendar, sans serveur. Sync 2 sens avec l'événement.
 - **Listes avec sous-listes**, quantités (« 4x pulkas »), codes masqués 🔐 (expurgés de TOUT ce qui sort de l'appareil — sauvegarde Drive, exports), modèles, partage, réordonnancement.
+- **🧺 Listes pro (v19.1)** : épinglage ⭐ d'une liste en haut de l'onglet, ordre manuel ⇅ des listes, filtres Tout / En cours / Modèles / Finies, date de l'événement lié 🔗 visible sur la carte, récap des quantités restantes dans le détail, vue « 🧮 Ce qui manque » consolidée toutes listes (cochable + imprimable, codes 🔐 jamais montrés), déplacement ➡️ d'un élément vers une autre liste depuis la modale.
 - **Google Agenda, synchro bidirectionnelle totale** : import auto ou manuel des événements ; toute modification (titre, date, horaires, type 🔴/🔵, note, relance, lieu) se synchronise dans les DEUX sens ; supprimer une tâche supprime son événement Google (immédiat, annulable 5 s) ; supprimer l'événement dans Google retire la tâche — jamais sans preuve (404/410/`cancelled` relus chez Google).
 - **Google Drive, fusion multi-appareils** : sauvegarde auto (30 s de debounce) dans le dossier `taffbmpm`, fusion additive avec `updatedAt` et pierres tombales (une suppression sur un appareil se propage, ne ressuscite pas).
 - **Hors-ligne complet** (service worker) : files de reprise pour toutes les écritures agenda, reconnexion auto, badge d'icône, thème clair/sombre.
@@ -35,10 +36,10 @@ Un seul fichier `index.html` (~3 500 lignes, zéro dépendance, zéro build) + `
 
 ## Tests et pipeline de développement
 
-- `v19-test-harness.js` : harnais Node qui exécute le script de la page avec des stubs pilotables (`__eventsFixture`, `__evGet`, `__delete404`, `__patchFails`…) — **255 assertions** (v18.8 + calendrier, stats, impression, recherche étendue, timeout Drive), lancé par la CI à chaque push (`.github/workflows/tests.yml`).
+- `v19.1-test-harness.js` : harnais Node qui exécute le script de la page avec des stubs pilotables (`__eventsFixture`, `__evGet`, `__delete404`, `__patchFails`…) — **325 assertions** (v19 + épinglage, ordre, filtres, récap quantités, vue manquant, déplacement), lancé par la CI à chaque push (`.github/workflows/tests.yml`).
 - Pipeline figé : vérifier chaque affirmation dans le code avant de corriger ; modifications par splices Node avec assertions d'unicité (`apply-vX.js`) ; vérification de syntaxe ; harnais vert avant tout push ; push contrôlé par dir listing (size + sha blob byte-exacts).
 - Historique détaillé : `CHANGELOG.md`.
 
 ## Versions
 
-v17 est la version courante — voir `CHANGELOG.md`. Après une mise à jour, recharger l'app **2 fois** (le service worker sert l'ancienne version au premier chargement).
+v19.1 est la version courante — voir `CHANGELOG.md`. Après une mise à jour, l'app se recharge toute seule (lecture de `sw.js` + comparaison de version) ; en cas de doute, recharger 2 fois (le service worker sert l'ancienne version au premier chargement).
