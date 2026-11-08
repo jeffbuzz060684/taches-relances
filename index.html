@@ -396,6 +396,45 @@
     max-width: 90%; text-align: center;
   }
   #toast.show { opacity: 1; }
+/* ===== v19 : Calendrier 🗓️, Statistiques 📊, Impression 🖨️ ===== */
+.calnav { display:flex; align-items:center; gap:8px; padding:10px 12px 4px; max-width:560px; margin:0 auto; }
+.calnav h3 { flex:1; text-align:center; margin:0; font-size:16px; font-weight:800; }
+.caldow { display:flex; max-width:560px; margin:0 auto; padding:0 8px; }
+.caldow span { flex:1; text-align:center; font-size:11px; color:var(--muted); padding:2px 0; }
+.calgrid { display:grid; grid-template-columns:repeat(7, 1fr); gap:3px; padding:4px 8px 12px; max-width:560px; margin:0 auto; }
+.calcell { position:relative; min-height:52px; border-radius:10px; background:rgba(255,255,255,0.04); border:1px solid transparent; padding:2px; display:flex; flex-direction:column; cursor:pointer; min-width:0; }
+.calcell.out { opacity:0.32; }
+.calcell.today { border-color:#4ade80; background:rgba(74,222,128,0.08); }
+.calcell .dnum { font-size:11px; text-align:right; padding:1px 3px 0; color:var(--muted); }
+.calcell.today .dnum { color:#4ade80; font-weight:800; }
+.caldots { display:flex; flex-wrap:wrap; gap:2px; padding:1px 3px; align-content:flex-start; }
+.cdot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+.cdot.p { background:#f87171; } .cdot.s { background:#60a5fa; } .cdot.e { background:#4ade80; }
+.cmore { font-size:9px; color:var(--muted); line-height:1; }
+.calwarn { max-width:560px; margin:0 auto; padding:2px 12px 4px; font-size:12px; color:#fca5a5; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.statgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 12px 4px; max-width:560px; margin:0 auto; }
+.statcard { background:rgba(255,255,255,0.04); border-radius:12px; padding:10px 12px; }
+.statcard .v { font-size:22px; font-weight:800; }
+.statcard .l { font-size:12px; color:var(--muted); }
+.statcard .d { font-size:11px; }
+.d-up { color:#4ade80; } .d-dn { color:#f87171; }
+.statbars { padding:4px 12px 16px; max-width:560px; margin:0 auto; }
+.bar19 { fill:#38bdf8; } .bar19.t { fill:#4ade80; }
+.blabel { fill:#94a3b8; font-size:9px; } .bval { fill:#e2e8f0; font-size:10px; font-weight:700; }
+html.light .calcell { background:#ffffff; border-color:#e2e8f0; }
+html.light .blabel { fill:#64748b; } html.light .bval { fill:#334155; }
+#printArea { display:none; }
+#printArea .pdoc { color:#000; background:#fff; padding:16px; font-family:-apple-system, "Segoe UI", Roboto, sans-serif; }
+#printArea .pdoc h1 { font-size:18px; margin:0 0 2px; }
+#printArea .pdoc h2 { font-size:14px; margin:14px 0 4px; }
+#printArea .pmeta { font-size:11px; color:#555; margin-bottom:10px; }
+#printArea .pdoc ul { margin:0; padding:0; }
+#printArea .pdoc li { list-style:none; padding:5px 0; border-bottom:1px solid #ddd; font-size:13px; }
+#printArea .pdoc .pempty { font-size:12px; color:#777; }
+@media print {
+  body.printing > *:not(#printArea) { display:none !important; }
+  #printArea { display:block !important; }
+}
 </style>
 </head>
 <body>
@@ -407,13 +446,15 @@
   <div class="hbtns">
     <span id="syncPill" class="syncpill" onclick="showView('agenda')" title="Synchro Google">🟠</span>
     <button id="themeBtn" class="agbtn" title="Thème clair / sombre" onclick="toggleTheme()">🌙</button>
+    <button class="agbtn" onclick="showView('cal')" title="Calendrier du mois (tâches + événements)">🗓️</button>
+    <button class="agbtn" onclick="showView('stats')" title="Mes statistiques">📊</button>
     <button class="agbtn" onclick="showView('agenda')" title="Agenda Google">📅</button>
   </div>
 </header>
 <div id="view-tasks" class="wrap">
   <nav id="tabbar"></nav>
   <div class="searchrow">
-    <input type="text" id="searchInput" placeholder="🔍 Rechercher une tâche, une note, une liste…" oninput="setSearch(this.value)">
+    <input type="text" id="searchInput" placeholder="🔍 Rechercher une tâche, une liste, un élément, un événement…" oninput="setSearch(this.value)">
     <button id="searchClear" class="hidden" onclick="setSearch('')">✕</button>
   </div>
   <div id="warnCard"></div>
@@ -429,6 +470,21 @@
 </div>
 <div id="view-list" class="hidden">
   <div id="listDetail"></div>
+</div>
+<div id="view-cal" class="hidden">
+  <div class="ag-head">
+    <button class="rowbtn" onclick="showView('tasks')">← Tâches</button>
+    <h2>🗓️ Calendrier</h2>
+    <button class="rowbtn" onclick="showView('agenda')" title="Vue liste + réglages de l'agenda">⚙️ Agenda</button>
+  </div>
+  <div id="calBody"></div>
+</div>
+<div id="view-stats" class="hidden">
+  <div class="ag-head">
+    <button class="rowbtn" onclick="showView('tasks')">← Tâches</button>
+    <h2>📊 Statistiques</h2>
+  </div>
+  <div id="statsBody"></div>
 </div>
 <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="handleImport(event)">
 <button id="fab" onclick="onFab()">＋</button>
@@ -603,12 +659,24 @@
     </div>
   </div>
 </div>
+<div id="calDayModal" class="modal hidden">
+  <div class="sheet">
+    <div class="st" id="calDayLabel">Jour</div>
+    <div id="calDayBody"></div>
+    <div class="row">
+      <button class="cancel" onclick="closeCalDay()">Fermer</button>
+      <button class="ok" onclick="openQuickAdd(calDay)">➕ Tâche ce jour</button>
+    </div>
+  </div>
+</div>
+<div id="printArea"></div>
 <div id="toast"></div>
 <script>
 "use strict";
 
 // ===== Tâches & Relances — v17 (demande Jade : « 1, 2, 3 sans oublier toutes les synchros et modifications dans les 2 sens ») : relances Google Calendar pilotées depuis l'app (poussées ET tirées, PATCH couleur+relances SEULES pour les importées), PATCH au lieu de PUT (lieu/invités/description/relances réglés dans Google ne sont plus écrasés au push des liées), DELETE 404/410 = succès, timeout 20 s sur TOUS les fetch agenda, synchro auto 2 min + toast ⚡ quand elle change quelque chose, la note suit la description Google dans les 2 sens =====
-var APP_VERSION = "v18.8";
+// ===== Tâches & Relances — v19 « Haut de gamme » : vue Calendrier 🗓️ (grille du mois, tâches + événements, feuille du jour, tâche créée sur la date choisie), Statistiques 📊 (10 dernières semaines en graphique, compteurs), Impression 🖨️ d'une liste (PDF — les codes 🔐 ne sont JAMAIS imprimés), recherche étendue aux listes + éléments + événements, timeout 20 s sur le DELETE Drive (le dernier fetch réseau sans garde-fou). Base v18 : relances Google 2 sens, PATCH, photo → liste (OCR). =====
+var APP_VERSION = "v19";
 var KEY = "taches-relances-v2";
 var TABS = ["tasks", "lists", "done"];
 var CATS = ["urgent", "week", "later", "done"];
@@ -1473,7 +1541,7 @@ function keepLocalSecrets(merged, oldList) { // v15 : réinjecte les codes 🔐 
 }
 function exportData() {
   return {
-    app: "taches-relances", version: 17, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version >= 16 = marqueur de rotation Drive (les fichiers v16+ n'ont plus de codes 🔐 dans leur historique)
+    app: "taches-relances", version: 19, tasks: state.tasks, lists: redactListsForExport(state.lists), // v16 : version >= 16 = marqueur de rotation Drive (les fichiers v16+ n'ont plus de codes 🔐 dans leur historique) ; v19 : format inchangé, simplement versionné
     autoAgenda: state.autoAgenda === true, importedEvents: state.importedEvents || {},
     tombstones: state.tombstones || [],
     savedAt: Date.now()
@@ -2229,7 +2297,7 @@ function driveFindFile(at, folderId) {
   });
 }
 function driveDeleteFile(at, fileId) { // v16 : rotation de la sauvegarde — l'historique de versions de l'ancien fichier ne suit pas
-  return fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId), { method: "DELETE", headers: { "Authorization": "Bearer " + at } }).then(function (r) {
+  return fetchTO17("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(fileId), { method: "DELETE", headers: { "Authorization": "Bearer " + at } }).then(function (r) { // v19 : timeout 20 s — le DERNIER fetch réseau encore sans garde-fou ne peut plus geler la rotation Drive
     if (r.status !== 200 && r.status !== 204) throw new Error("suppression Drive refusée");
     return true;
   });
@@ -2820,8 +2888,33 @@ function renderTasksTab() {
       return (String(t.title).toLowerCase().indexOf(searchQ) >= 0)
         || (String(t.note || "").toLowerCase().indexOf(searchQ) >= 0);
     }).sort(cmpTasks);
-    var h = '<div class="empty">🔎 ' + res.length + " résultat(s) pour « " + esc(searchQ) + " »</div>";
-    res.forEach(function (t) { h += taskHtml(t); });
+    // v19 : la recherche touche AUSSI les listes (nom + éléments) et les événements de l'agenda
+    var lRes = state.lists.filter(function (l) {
+      if (String(l.name).toLowerCase().indexOf(searchQ) >= 0) return true;
+      return (l.items || []).some(function (it) { return String(it.text || "").toLowerCase().indexOf(searchQ) >= 0; });
+    });
+    var eRes = ((state.agendaCache && state.agendaCache.events) || []).filter(function (e) {
+      return String(e.title).toLowerCase().indexOf(searchQ) >= 0;
+    });
+    var h = '<div class="empty">🔎 ' + (res.length + lRes.length + eRes.length) + " résultat(s) pour « " + esc(searchQ) + " »</div>";
+    if (res.length) {
+      h += '<div class="flabel">📋 Tâches</div>';
+      res.forEach(function (t) { h += taskHtml(t); });
+    }
+    if (lRes.length) {
+      h += '<div class="flabel">🧺 Listes</div>';
+      lRes.forEach(function (l) {
+        var pr = listProgress(l);
+        h += '<div class="task">'
+          + '<div class="body" style="cursor:pointer" onclick="openList(\'' + l.id + '\')"><div class="title">🧺 ' + esc(l.name) + '</div>'
+          + '<div class="meta">' + pr.done + "/" + pr.total + " ✓</div></div>"
+          + '<div class="acts"><button onclick="openList(\'' + l.id + '\')">Ouvrir</button></div></div>';
+      });
+    }
+    if (eRes.length) {
+      h += '<div class="flabel">📅 Événements</div>';
+      eRes.forEach(function (e) { h += evRowHtml(e); });
+    }
     el.innerHTML = h;
     renderBackupCard();
     return;
@@ -3020,6 +3113,7 @@ function renderListDetail() {
       : '<button onclick="toggleHideDone(\'' + l.id + '\')">🙈 Masquer cochés</button>')
     + '<button onclick="shareList(\'' + l.id + '\')">📤 Partager</button>'
     + '<button onclick="copyListText(\'' + l.id + "')\">📋 Copier en texte</button>"
+    + '<button title="Imprimer ou enregistrer en PDF — les codes 🔐 ne sont jamais imprimés" onclick="printList(\'' + l.id + "')\">🖨️ Imprimer / PDF</button>"
     + '<button onclick="duplicateList(\'' + l.id + "');renderAll()\">📋 Dupliquer</button>"
     + '<button onclick="toggleTemplate(\'' + l.id + "')\">" + (l.template === true ? "📌 Modèle : ✅ ON" : "📌 Garder comme modèle") + "</button>"
     + '<button onclick="openListModal(null,\'' + l.id + "')\">➕ Sous-liste</button>"
@@ -3139,6 +3233,8 @@ function showView(v) {
   document.getElementById("view-tasks").className = (v === "tasks") ? "wrap" : "wrap hidden";
   document.getElementById("view-agenda").className = (v === "agenda") ? "" : "hidden";
   document.getElementById("view-list").className = (v === "list") ? "" : "hidden";
+  document.getElementById("view-cal").className = (v === "cal") ? "" : "hidden"; // v19 : vue Calendrier
+  document.getElementById("view-stats").className = (v === "stats") ? "" : "hidden"; // v19 : vue Statistiques
   document.getElementById("fab").style.display = (v === "tasks") ? "" : "none";
   renderAll();
 }
@@ -3164,6 +3260,8 @@ function renderAll() {
   updateBadge(); // badge de l'icône = retards + aujourd'hui
   if (view === "tasks") renderTasksTab();
   else if (view === "list") renderListDetail();
+  else if (view === "cal") renderCal(); // v19 : le calendrier se redessine aussi (et la feuille du jour suit les ✓ / reports)
+  else if (view === "stats") renderStats();
   else renderAgenda();
   if (_keep) {
     var el2 = document.getElementById("itemInput");
@@ -3174,15 +3272,24 @@ function renderAll() {
 // ---------- Saisie rapide (une ligne + puces de date) ----------
 var quickDue = "today";
 var quickType = "perso";
-function openQuickAdd() {
+function openQuickAdd(dateIso) {
   var inp = document.getElementById("qTitle");
   if (inp) inp.value = "";
-  quickPick("today");
+  var pre = (typeof dateIso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateIso)) ? dateIso : null; // v19 : le calendrier préremplit la date du jour choisi
+  if (pre) {
+    quickDue = "date";
+    ["today", "tomorrow", "week", "none"].forEach(function (c) {
+      var el = document.getElementById("q-" + c);
+      if (el) el.className = "chip";
+    });
+  } else {
+    quickPick("today");
+  }
   quickPickType("perso");
   var chk = document.getElementById("qAgenda");
   if (chk) chk.checked = (state.cfg && state.cfg.quickAgenda) === true; // le choix agenda est mémorisé
   var dp = document.getElementById("qDate");
-  if (dp) dp.value = "";
+  if (dp) dp.value = pre || "";
   document.getElementById("quickModal").className = "modal";
   try { if (inp && inp.focus) inp.focus(); } catch (e) {}
 }
@@ -3702,6 +3809,227 @@ if (typeof addEventListener === "function") {
   });
 }
 
+// ====================== v19 « Haut de gamme » ======================
+// Vue Calendrier 🗓️ : grille du mois (tâches + événements agenda), feuille du jour,
+// création d'une tâche directement datée. Les événements hors fenêtre de synchro
+// n'apparaissent pas (l'agenda ne les a pas encore téléchargés) — les tâches, elles, y sont toujours.
+var calMonth = null; // "YYYY-MM" du mois affiché (null = mois en cours, recalculé au rendu)
+var calDay = null;   // jour ouvert dans la feuille (ISO)
+var CAL_DOW = ["L", "M", "M", "J", "V", "S", "D"];
+function calMonthOf(iso) { return String(iso || today()).slice(0, 7); }
+function calShiftMonth(ym, n) { // décalage de mois en arithmétique pure (pas de Date — toujours déterministe)
+  var p = String(ym).split("-");
+  var m = (parseInt(p[1], 10) || 1) - 1 + n;
+  var y = (parseInt(p[0], 10) || 2026) + Math.floor(m / 12);
+  m = ((m % 12) + 12) % 12;
+  return y + "-" + pad2(m + 1);
+}
+function calMonthLabel(ym) {
+  var MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  var p = String(ym).split("-");
+  return MOIS[(parseInt(p[1], 10) || 1) - 1] + " " + p[0];
+}
+function calDaysInMonth(ym) { return daysDiffISO(ym + "-01", calShiftMonth(ym, 1) + "-01"); }
+// tâches + événements d'un jour donné (une tâche multi-jours apparaît sur TOUTE sa plage, comme les événements)
+function calDayItems(iso) {
+  var ts = state.tasks.filter(function (t) {
+    if (t.cat === "done" || !t.due) return false;
+    if (t.until && t.until >= t.due) return (iso >= t.due && iso <= t.until);
+    return iso === t.due;
+  });
+  var evs = [];
+  ((state.agendaCache && state.agendaCache.events) || []).forEach(function (e) {
+    var end = (e.until && e.until >= e.day) ? e.until : e.day;
+    if (iso >= e.day && iso <= end) evs.push(e);
+  });
+  return { tasks: ts, events: evs };
+}
+function calDotCls(t) { return (t.type === "pro") ? "p" : "s"; }
+function calEvDotCls(e) { return (e.color === "11") ? "p" : ((e.color === "9") ? "s" : "e"); }
+function calCellDotsHtml(items) {
+  if (!items.length) return "";
+  var h = '<div class="caldots">';
+  var shown = items.slice(0, 3);
+  shown.forEach(function (x) {
+    h += '<i class="cdot ' + (x.ev ? calEvDotCls(x.ev) : calDotCls(x.t)) + '"></i>'; // x = wrapper {t} ou {ev} — la pastille lit l'OBJET sous-jacent (bug attrapé par le harnais v19)
+  });
+  if (items.length > 3) h += '<span class="cmore">+' + (items.length - 3) + "</span>";
+  return h + "</div>";
+}
+function calGridHtml() {
+  var ym = calMonth || calMonthOf(today());
+  var first = ym + "-01";
+  var offset = ((daysDiffISO("2024-01-01", first) % 7) + 7) % 7; // 2024-01-01 = lundi → index 0 = lundi
+  var total = Math.ceil((offset + calDaysInMonth(ym)) / 7) * 7;
+  var start = addDaysISO(first, -offset);
+  var td = today();
+  var h = "";
+  for (var i = 0; i < total; i++) {
+    var iso = addDaysISO(start, i);
+    var b = calDayItems(iso);
+    var items = b.tasks.map(function (t) { return { t: t }; }).concat(b.events.map(function (e) { return { ev: e }; }));
+    h += '<button class="calcell' + (iso.slice(0, 7) === ym ? "" : " out") + (iso === td ? " today" : "") + '"'
+      + ' onclick="openCalDay(\'' + iso + '\')" title="' + esc(dayLongLabel(iso)) + '">'
+      + '<span class="dnum">' + parseInt(iso.slice(8), 10) + "</span>"
+      + calCellDotsHtml(items)
+      + "</button>";
+  }
+  return h;
+}
+function calNavHtml() {
+  var ym = calMonth || calMonthOf(today());
+  var td = today();
+  var late = 0;
+  state.tasks.forEach(function (t) { if (t.cat !== "done" && t.due && t.due < td) late++; });
+  return '<div class="calnav">'
+    + '<button class="rowbtn" onclick="calPrev()">◀</button>'
+    + '<h3>' + calMonthLabel(ym) + "</h3>"
+    + '<button class="rowbtn" onclick="calNext()">▶</button>'
+    + "</div>"
+    + '<div class="calnav" style="padding-top:0;padding-bottom:0">'
+    + '<button class="rowbtn" onclick="calGoToday()">📍 Aujourd\'hui</button>'
+    + (late > 0 ? '<span class="calwarn" style="padding:0">⚠️ ' + late + " en retard</span>" : "")
+    + "</div>"
+    + '<div class="caldow">' + CAL_DOW.map(function (d) { return "<span>" + d + "</span>"; }).join("") + "</div>";
+}
+function renderCal() {
+  if (!calMonth) calMonth = calMonthOf(today());
+  document.getElementById("calBody").innerHTML = calNavHtml() + '<div class="calgrid">' + calGridHtml() + "</div>";
+  var dm = document.getElementById("calDayModal");
+  if (dm && dm.className === "modal" && calDay) renderCalDayBody(); // la feuille du jour ouverte suit les ✓ / reports / modifications
+}
+function calPrev() { calMonth = calShiftMonth(calMonth || calMonthOf(today()), -1); renderCal(); }
+function calNext() { calMonth = calShiftMonth(calMonth || calMonthOf(today()), 1); renderCal(); }
+function calGoToday() { calMonth = null; renderCal(); } // null = retour au mois en cours
+function openCalDay(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || "")) return;
+  calDay = iso;
+  document.getElementById("calDayLabel").textContent = dayHeaderLabel(iso);
+  renderCalDayBody();
+  document.getElementById("calDayModal").className = "modal";
+}
+function closeCalDay() { document.getElementById("calDayModal").className = "modal hidden"; }
+function renderCalDayBody() {
+  var b = calDayItems(calDay);
+  var h = "";
+  if (b.tasks.length) {
+    h += '<div class="flabel">📋 Tâches</div>';
+    b.tasks.sort(cmpDayTime).forEach(function (t) {
+      h += '<div class="task' + (t.due < today() ? " late" : "") + '">'
+        + '<button class="chk" title="Marquer faite" onclick="completeTask(\'' + t.id + "');renderAll()\">✓</button>"
+        + '<div class="body" style="cursor:pointer" onclick="openModal(\'' + t.id + '\')"><div class="title"><span class="tp">' + (t.type === "pro" ? "🔴" : "🔵") + "</span>" + esc(t.title)
+        + (t.startT ? ' <span class="meta">🕒 ' + t.startT + (t.endT ? "–" + t.endT : "") + "</span>" : "")
+        + "</div>"
+        + (t.until && t.until !== t.due ? '<div class="meta">jusqu\'au ' + fmtDate(t.until) + "</div>" : "")
+        + "</div>"
+        + '<div class="acts">'
+        + '<button title="Reporter" onclick="deferTask(\'' + t.id + '\');renderAll()">⬅️</button>'
+        + '<button title="Modifier" onclick="openModal(\'' + t.id + "')\">✏️</button>"
+        + "</div></div>";
+    });
+  }
+  if (b.events.length) {
+    h += '<div class="flabel">📅 Événements</div>';
+    b.events.sort(cmpDayTime).forEach(function (e) { h += evRowHtml(e); });
+  }
+  if (!h) h = '<div class="empty">Rien de prévu ce jour-là — « ➕ Tâche ce jour » pour en créer une.</div>';
+  document.getElementById("calDayBody").innerHTML = h;
+}
+
+// ---------- v19 : Statistiques 📊 (tâches terminées par semaine, compteurs clés) ----------
+function weekKeyOf(iso) { // lundi de la semaine (0 = lundi, ancré sur 2024-01-01 = lundi)
+  var off = ((daysDiffISO("2024-01-01", String(iso)) % 7) + 7) % 7;
+  return addDaysISO(String(iso), -off);
+}
+function statsWeeksData(n) {
+  n = n || 10;
+  var thisMon = weekKeyOf(today());
+  var weeks = [];
+  for (var i = n - 1; i >= 0; i--) weeks.push({ key: addDaysISO(thisMon, -7 * i), count: 0 });
+  state.tasks.forEach(function (t) {
+    if (t.cat !== "done" || !t.doneAt) return;
+    var k = weekKeyOf(String(t.doneAt).slice(0, 10));
+    for (var j = 0; j < weeks.length; j++) if (weeks[j].key === k) { weeks[j].count++; break; }
+  });
+  return weeks;
+}
+function statsBarsSvg(weeks) {
+  var max = 1;
+  weeks.forEach(function (w) { if (w.count > max) max = w.count; });
+  var bw = 22, W = 320, H = 150;
+  var gap = weeks.length > 1 ? (W - 8 - weeks.length * bw) / (weeks.length - 1) : 0;
+  var bars = "", labels = "";
+  weeks.forEach(function (w, i) {
+    var x = 4 + i * (bw + gap);
+    var h = Math.max(Math.round((w.count / max) * 92), 2);
+    var y = 114 - h;
+    bars += '<rect class="bar19' + (i === weeks.length - 1 ? " t" : "") + '" x="' + x.toFixed(1) + '" y="' + y + '" width="' + bw + '" height="' + h + '" rx="3"><title>' + w.count + ' tâche(s) — semaine du ' + fmtDate(w.key) + "</title></rect>";
+    if (w.count > 0) bars += '<text class="bval" x="' + (x + bw / 2).toFixed(1) + '" y="' + (y - 4) + '" text-anchor="middle">' + w.count + "</text>";
+    labels += '<text class="blabel" x="' + (x + bw / 2).toFixed(1) + '" y="128" text-anchor="middle">' + w.key.slice(8) + "/" + w.key.slice(5, 7) + "</text>";
+  });
+  return '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;max-width:320px" role="img" aria-label="Tâches terminées par semaine">' + bars + labels + "</svg>";
+}
+function statsHtml() {
+  var weeks = statsWeeksData(10);
+  var wNow = weeks[weeks.length - 1], wPrev = weeks[weeks.length - 2] || { count: 0 };
+  var t0 = today(), ym = t0.slice(0, 7);
+  var actives = 0, overdue = 0, doneMonth = 0, doneTotal = 0;
+  state.tasks.forEach(function (t) {
+    if (t.cat === "done") { doneTotal++; if (String(t.doneAt || "").slice(0, 7) === ym) doneMonth++; }
+    else { actives++; if (t.due && t.due < t0) overdue++; }
+  });
+  var items = 0, itemsDone = 0;
+  state.lists.forEach(function (l) { (l.items || []).forEach(function (it) { items++; if (it.done) itemsDone++; }); });
+  var d = wNow.count - wPrev.count;
+  var dTxt = (d > 0) ? '<span class="d-up">▲ +' + d + " vs la semaine dernière</span>"
+    : (d < 0 ? '<span class="d-dn">▼ ' + d + " vs la semaine dernière</span>" : "— comme la semaine dernière");
+  var best = weeks.slice().sort(function (a, b) { return b.count - a.count; })[0];
+  return '<div class="statgrid">'
+    + '<div class="statcard"><div class="v">' + wNow.count + '</div><div class="l">✅ faites cette semaine</div><div class="d">' + dTxt + "</div></div>"
+    + '<div class="statcard"><div class="v">' + doneMonth + '</div><div class="l">✅ faites ce mois-ci</div></div>'
+    + '<div class="statcard"><div class="v">' + actives + '</div><div class="l">📋 en cours</div></div>'
+    + '<div class="statcard"><div class="v">' + overdue + '</div><div class="l">⚠️ en retard</div></div>'
+    + '<div class="statcard"><div class="v">' + doneTotal + '</div><div class="l">🏆 terminées au total</div></div>'
+    + '<div class="statcard"><div class="v">' + itemsDone + "/" + items + '</div><div class="l">🧺 éléments cochés · ' + state.lists.length + " liste(s)</div></div>"
+    + "</div>"
+    + '<div class="statbars"><div class="flabel">📈 Tâches terminées — 10 dernières semaines</div>' + statsBarsSvg(weeks)
+    + '<div class="meta" style="font-size:12px;color:var(--muted);padding:4px 2px 0">Meilleure semaine : celle du ' + fmtDate(best.key) + " · " + best.count + " tâche(s)</div></div>";
+}
+function renderStats() {
+  document.getElementById("statsBody").innerHTML = statsHtml();
+}
+
+// ---------- v19 : Impression / PDF d'une liste 🖨️ (les codes 🔐 ne sont JAMAIS imprimés) ----------
+function printItemsHtml(l) {
+  if (!l.items || !l.items.length) return '<p class="pempty">(liste vide)</p>';
+  return "<ul>" + l.items.map(function (it) {
+    var txt = (it.qty ? it.qty + " × " : "") + (it.secret ? "•••••• (code masqué — jamais imprimé)" : esc(it.text));
+    return "<li>" + (it.done ? "☑" : "☐") + " " + txt + "</li>";
+  }).join("") + "</ul>";
+}
+function printListHtml(l) {
+  var pr = listProgress(l);
+  var subs = state.lists.filter(function (c) { return c.parent === l.id; });
+  var h = '<h1>📋 ' + esc(l.name) + "</h1>"
+    + '<div class="pmeta">Imprimé le ' + fmtDate(today()) + " · " + pr.done + "/" + pr.total + " coché(s)" + (subs.length ? " · " + subs.length + " sous-liste(s)" : "") + "</div>";
+  h += printItemsHtml(l);
+  subs.forEach(function (c) {
+    var pc = listProgress(c);
+    h += "<h2>📁 " + esc(c.name) + " (" + pc.done + "/" + pc.total + ")</h2>" + printItemsHtml(c);
+  });
+  return '<div class="pdoc">' + h + "</div>";
+}
+function printList(id) {
+  var l = getList(id);
+  if (!l) return;
+  document.getElementById("printArea").innerHTML = printListHtml(l);
+  try { if (document.body && document.body.classList) document.body.classList.add("printing"); } catch (e) {}
+  try { if (typeof window !== "undefined" && window.print) window.print(); } catch (e) {}
+  setTimeout(function () { // le dialogue d'impression est bloquant sur mobile — on nettoie juste après
+    try { if (document.body && document.body.classList) document.body.classList.remove("printing"); } catch (e) {}
+  }, 1500);
+}
+
 // ---------- Démarrage ----------
 document.getElementById("vBadge").textContent = APP_VERSION;
 applyTheme(); // ☀️/🌙 mémorisé dans la config
@@ -3722,6 +4050,7 @@ function closeAllSheets() {
   try { closeDeferSheet(); } catch (e2) {}
   try { closeItemModal(); } catch (e2) {}
   try { closePhotoModal(); } catch (e2) {}
+  try { closeCalDay(); } catch (e2) {} // v19 : la feuille du jour du calendrier se ferme avec les autres
 }
 // Retour au premier plan de l'app (PWA) : on resynchronise
 if (typeof document !== "undefined" && document.addEventListener) {

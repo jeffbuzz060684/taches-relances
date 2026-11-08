@@ -7,6 +7,9 @@ PWA installable (ajout à l'écran d'accueil) de gestion de tâches et de relanc
 ## Fonctionnalités
 
 - **Tâches** à échéance (le retard / le jour / la semaine classent tout seul), type 🔴 pro / 🔵 perso, horaires, notes, répétitions (y compris mensuelles fidèles au jour d'origine), report, annulation 5 s, recherche.
+- **🗓️ Calendrier intégré** : grille du mois mêlant tâches et événements agenda (pastilles 🔴/🔵/🟢), navigation mois par mois, feuille du jour (✓ ⬅️ ✏️ ＋ sur chaque item) et création d'une tâche datée du jour choisi.
+- **📊 Statistiques** : compteurs de la semaine (tendance vs semaine précédente), retards, totaux + graphique SVG des 10 dernières semaines.
+- **🖨️ Impression / PDF** d'une liste (cases, quantités, sous-listes) — les codes 🔐 ne sont jamais imprimés.
 - **Relances réelles** : chaque tâche peut piloter la notification Google Calendar (aucune / défaut agenda / 10 min à 2 jours avant) — la popup arrive par l'app Google Calendar, sans serveur. Sync 2 sens avec l'événement.
 - **Listes avec sous-listes**, quantités (« 4x pulkas »), codes masqués 🔐 (expurgés de TOUT ce qui sort de l'appareil — sauvegarde Drive, exports), modèles, partage, réordonnancement.
 - **Google Agenda, synchro bidirectionnelle totale** : import auto ou manuel des événements ; toute modification (titre, date, horaires, type 🔴/🔵, note, relance, lieu) se synchronise dans les DEUX sens ; supprimer une tâche supprime son événement Google (immédiat, annulable 5 s) ; supprimer l'événement dans Google retire la tâche — jamais sans preuve (404/410/`cancelled` relus chez Google).
@@ -32,7 +35,7 @@ Un seul fichier `index.html` (~3 500 lignes, zéro dépendance, zéro build) + `
 
 ## Tests et pipeline de développement
 
-- `v17-test-harness.js` : harnais Node qui exécute le script de la page avec des stubs pilotables (`__eventsFixture`, `__evGet`, `__delete404`, `__patchFails`…) — **136 assertions**, lancé par la CI à chaque push (`.github/workflows/tests.yml`).
+- `v19-test-harness.js` : harnais Node qui exécute le script de la page avec des stubs pilotables (`__eventsFixture`, `__evGet`, `__delete404`, `__patchFails`…) — **255 assertions** (v18.8 + calendrier, stats, impression, recherche étendue, timeout Drive), lancé par la CI à chaque push (`.github/workflows/tests.yml`).
 - Pipeline figé : vérifier chaque affirmation dans le code avant de corriger ; modifications par splices Node avec assertions d'unicité (`apply-vX.js`) ; vérification de syntaxe ; harnais vert avant tout push ; push contrôlé par dir listing (size + sha blob byte-exacts).
 - Historique détaillé : `CHANGELOG.md`.
 
